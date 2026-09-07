@@ -2,3 +2,4 @@
 *.zip
 competition/
 results/
+__pycache__

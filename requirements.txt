@@ -7,3 +7,4 @@ databench_eval
 boto3
 ollama
 pyyaml
+openai
