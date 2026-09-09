@@ -1,3 +1,8 @@
+# class_name과 arguments가 반복되는 껍데기이고, 
+# 진짜 내용은 프롬프트 제너레이터 3층(zero-shot → few-shot CoT → Claude 메시지 래핑), 
+# answerer 1개, 후처리기 1개, 실행기 1개이며 
+# 나머지 !LOADER_PLACEHOLDER 같은 태그는 실행 시점에 코드가 채우는 자리표시자
+
 complete_pipe:
   class_name: pipelines.ErrorFixingAndTimeoutPipeline
   arguments:
@@ -10,10 +15,22 @@ complete_pipe:
             loader: !LOADER_PLACEHOLDER
             prompt_generator:
               class_name: prompt_generators.FewShotChainOfThoughtBuilderWithTypesRowsAndPredictingResultingTypesVol2
+              # FewShot = 예시 몇 개를 프롬프트에 넣음
+              # ChainOfThoughtBuilder = 그 예시에 사람이 쓴 사고 과정 주석을 붙여 조립
+              # WithTypesRows = 테이블의 컬럼 타입 정보와 미리보기 행을 포함
+              # PredictingResultingTypes = 모델에게 답의 타입(숫자인지 리스트인지 등)까지 먼저 예측하게 함
+              # Vol2 = 2차 개정판              
               arguments:
                 loader: !LOADER_PLACEHOLDER
                 prompt_generator:
                   class_name: prompt_generators.ZeroShotDetailedTypesRowsExValuesNullsOneLineRowsVol2
+                  # ZeroShot = 예시 없이 질문만 프롬프트에 넣음
+                  # DetailedTypes = 컬럼별 dtype과 파이썬 내부 타입까지 상세히 기술
+                  # Rows = 테이블 미리보기 행 포함(num_rows: 5)
+                  # ExValues = 컬럼별 예시 값
+                  # Nulls = non-null 개수
+                  # OneLineRows = 행을 한 줄로 압축해 표시
+                  # Vol2 = 2차 개정판
                   arguments:
                     loader: !LOADER_PLACEHOLDER
                     num_rows: 5

@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 import yaml
 import argparse
 
-
 def instantiate_pipeline_from_yaml(config_path, exemplar_indices, annotations_filename, client=None, debug=False, lite=False):
 
     loader = utils.generic_load_table if not lite else utils.generic_load_sample

@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Any, Union
 
 # =========================================== Hierarchy of Prompt Generators ===========================================
-# PromptGenerator (ABC)
+# PromptGenerator (ABC, 추상 기반 클래스)
 # │
 # ├── ZeroShotGenerator (ABC)
 # │   ├── ZeroShotDetailedTypesRowsExValuesNullsOneLineRowsVol2

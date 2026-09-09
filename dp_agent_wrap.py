@@ -150,3 +150,70 @@ class InlineStatementExecutor(Executor):
 
     def __str__(self):
         return f"InlineStatementExecutor(Executor)\n\tloader: {self.loader}\n\ttimeout: {self.timeout}"
+
+import core.prompt_generators as pgs
+import core.postprocessors as postprocessors
+import core.pipelines as pipelines
+import core.utils as utils
+
+
+class SchemaOnlyZeroShot(pgs.ZeroShotGenerator):
+    """TD + CD만 포함. 샘플 행(SR) 없음."""
+    def __init__(self, loader):
+        super().__init__(loader)
+
+    def __call__(self, row):
+        df = self.loader(row['dataset'])
+        info = "\n        ".join(pgs.custom_info_csv_2(df).split('\n'))
+        return f"""\
+# TODO: complete the following function. It should give the answer to: {row['question']}
+def answer(df: pd.DataFrame):
+    \"\"\"
+        {info}
+    \"\"\"
+
+
+    df.columns = {list(df.columns)}
+    """
+
+    def __str__(self):
+        return f"SchemaOnlyZeroShot(loader={self.loader})"
+
+# 예시 렌더링이 FewShot.__init__에서 일어나기 때문에, 생성기를 먼저 만든 뒤에
+# 생성기를 넘겨서 조립부를 새로 생성해야 함
+def build_pipe_nosr(model="gpt-4o-mini", temperature=0.0, debug=False):
+    load_dotenv()
+    loader = utils.generic_load_table
+
+    _, exemplars = utils.annotation_reader("annotation/annotations_cot.json")
+    idx = [17, 0, 28, 31, 4, 24, 20, 8, 14]          # main.py의 exemplar_indices 첫 성분
+    shots = [exemplars[i] for i in idx]
+
+    zs = SchemaOnlyZeroShot(loader)                   # 실제 질문용
+    eb = pgs.ExemplarBuilder(loader, SchemaOnlyZeroShot(loader))   # 예시용(별도 인스턴스)
+    few = pgs.FewShotChainOfThoughtBuilderWithTypesRowsAndPredictingResultingTypesVol2(
+        loader, zs, eb, shots=shots)
+    wrapped = pgs.ClaudeMessageEmbeddingPromptGenerator(loader, few)
+
+    post = postprocessors.TillReturnLinePostProcessorMultipleIndents(
+        loader, prefix=4,
+        first_prefix='    # The columns used to answer the question: ')
+
+    main_pipe = pipelines.Pipeline(
+        wrapped,
+        OpenAIAnswerer(model=model, temperature=temperature, max_gen_len=300),
+        post,
+        InlineStatementExecutor(loader),
+        debug=debug,
+    )
+
+    ef_gen = pgs.ErrorFixingGeneratorClaudeVol2(
+        loader, SchemaOnlyZeroShot(loader), num_rows=10)
+    ef_pipe = pipelines.ErrorFixPipeline(
+        ef_gen,
+        OpenAIAnswerer(model=model, temperature=temperature, max_gen_len=1000),
+        post,
+        InlineStatementExecutor(loader),
+    )
+
+    return pipelines.ErrorFixingAndTimeoutPipeline(main_pipe, ef_pipe, 600, num_attempts=2)
