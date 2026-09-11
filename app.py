@@ -1,4 +1,4 @@
-# app.py
+# streamlit 데모 진입점
 import streamlit as st
 from ui import auth, db, state
 
@@ -33,7 +33,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 역할별 페이지 구성 ---
-agent_qa = st.Page("ui/pages/agent_qa.py", title="Agent Q&A",
+agent_qa = st.Page("ui/pages/agent_qa.py", title="DP Agent Console",
                    icon=":material/chat:", default=True)
 
 pages = {"Workspace": [agent_qa]}

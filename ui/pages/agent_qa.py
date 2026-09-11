@@ -7,14 +7,28 @@ st.session_state.setdefault("last_result", None)
 
 with st.session_state.nav_slot:
     st.markdown("**질의 대상 DB**")
-    st.selectbox("Database", ab.DB_CHOICES, key="db_name",
+    dom = st.selectbox("도메인", ab.catalog.domains(), key="db_domain")
+    choices = ab.catalog.names(dom)
+
+    if not choices:
+        st.error("data/ 에서 all.parquet 을 찾지 못했습니다.")
+        st.stop()
+    if st.session_state.db_name not in choices:
+        st.session_state.db_name = choices[0]
+
+    st.selectbox("Database", choices, key="db_name",
+                 format_func=lambda n: f"{n} · {ab.catalog.meta(n)['title'][:28]}",
                  label_visibility="collapsed")
-    st.caption("🔒 원본 레코드 직접 접근 불가 · 스키마만 노출")
+
+    m = ab.catalog.meta(st.session_state.db_name)
+    # st.caption(f"{m['n_rows']:,}행 × {m['n_cols']}열 · {m['domain']}")
+    # st.caption("🔒 원본 레코드 직접 접근 불가 · 스키마만 노출")
+
 
 head, badge = st.columns([3, 1], vertical_alignment="center")
 with head:
-    st.title("Agent Q&A")
-    st.caption("질문 → 코드 생성 → 편집기에 주입 → 자동 실행")
+    st.title("DP Agent Console")
+    st.caption("질문 → 코드 생성 → 편집기에 주입 → 자동 실행 → DP 보호")
 with badge:
     st.success(f"● {st.session_state.db_name}", icon="🗄️")
 
@@ -29,7 +43,7 @@ m4.metric("질의 수",
           border=True)
 st.write("")
 
-left, right = st.columns([1, 1.5], gap="medium")
+left, right = st.columns([1.3, 1.5], gap="medium")
 
 # ── 좌: 스키마 ──────────────────────────────────────────────
 with left:
@@ -44,10 +58,10 @@ with left:
             st.dataframe(view, hide_index=True, use_container_width=True,
                          height=min(38 * (len(view) + 1) + 3, 400),
                          column_config={
-                             "column":   st.column_config.TextColumn("컬럼", width="medium"),
-                             "dtype":    st.column_config.TextColumn("타입", width="small"),
-                             "non_null": st.column_config.NumberColumn("non-null", width="small"),
-                         })
+                             "column":   st.column_config.TextColumn("컬럼", width=120),
+                             "dtype":    st.column_config.TextColumn("타입", width=300)})
+                        #      "non_null": st.column_config.NumberColumn("non-null", width="small"),
+                        #  })
         except Exception as e:
             st.warning(f"스키마 로드 실패: {e}")
 
@@ -55,7 +69,7 @@ with left:
 with right:
     with st.container(border=True, height=560):
         st.markdown("##### ⌨️ 코드")
-        st.code("def answer(df: pd.DataFrame):", language="python")
+        # st.code("def answer(df: pd.DataFrame):", language="python")
         slot = st.empty()
 
         if st.session_state.pending_q:
@@ -118,8 +132,8 @@ with right:
                           border=True, help="아직 노이즈가 적용되지 않은 참값입니다.")
                 c2.metric("소모 ε", f"{st.session_state.eps:.2f}", border=True)
                 c3.metric("LLM 호출", res["calls"], border=True)
-                st.caption("⚠️ 현재 단계에서는 라플라스 노이즈가 적용되지 않습니다. "
-                           "표시값은 참값이며, DP 보장은 라운드 루프 연결 후 적용됩니다.")
+                # st.caption("⚠️ 현재 단계에서는 라플라스 노이즈가 적용되지 않습니다. "
+                #            "표시값은 참값이며, DP 보장은 라운드 루프 연결 후 적용됩니다.")
             else:
                 st.error(str(res["value"]), icon="⚠️")
 

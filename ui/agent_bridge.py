@@ -2,8 +2,27 @@
 import os, time
 import pandas as pd
 import streamlit as st
+from ui import catalog
 
-DB_CHOICES = ["CardBase", "066_IBM_HR", "052_Professional"]   # 데모용 목록
+DB_CHOICES = catalog.names()          # data/ + competition/ 스캔 결과
+
+
+def local_load_table(name: str) -> pd.DataFrame:
+    return pd.read_parquet(catalog.table_path(name))
+
+
+def install_local_loader() -> bool:
+    """core.utils 의 로더를 로컬 우선으로 갈아끼운다. HF 다운로드 차단."""
+    try:
+        import core.utils as utils
+        utils.generic_load_table = local_load_table
+        utils.generic_load_sample = lambda n: local_load_table(n).head(20)
+        return True
+    except Exception:
+        return False
+
+
+install_local_loader()
 
 
 @st.cache_resource(show_spinner="에이전트 파이프라인 준비 중…")
@@ -17,18 +36,12 @@ def get_pipe(model: str = "gpt-4o-mini", temperature: float = 0.0):
 
 @st.cache_data(show_spinner=False)
 def load_df(db_name: str) -> pd.DataFrame:
-    import core.utils as utils
-    return utils.generic_load_table(db_name)
+    return catalog.load_df(db_name)
 
 
 @st.cache_data(show_spinner=False)
 def schema_of(db_name: str) -> pd.DataFrame:
-    df = load_df(db_name)
-    return pd.DataFrame({
-        "column": df.columns,
-        "dtype": [str(t) for t in df.dtypes],
-        "non_null": [int(df[c].notnull().sum()) for c in df.columns],
-    })
+    return catalog.schema_of(db_name)
 
 
 def stream_code(question: str, db_name: str, model="gpt-4o-mini", temperature=0.0):
