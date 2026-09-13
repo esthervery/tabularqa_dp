@@ -1,17 +1,4 @@
-"""로컬 데이터셋 카탈로그.
-
-`competition/` 하위 폴더를 스캔해 (all.parquet + info.yml) 있는
-디렉터리를 하나의 "DB" 로 취급한다.
-
-주요 API
-    catalog()      DataFrame(name, title, domain, source, n_rows, n_cols, path)
-    names(domain?) 도메인 필터를 걸어 이름 목록
-    domains()      ['전체', ...도메인 목록]
-    meta(name)     특정 DB 의 메타 dict
-    table_path(name)  parquet 경로
-    load_df(name)     parquet 을 DataFrame 으로 (캐시됨)
-    schema_of(name)   parquet 메타에서 컬럼/타입만 빠르게 추출
-"""
+"""로컬 data/ 디렉터리를 스캔해 DB 카탈로그를 만든다."""
 from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
@@ -22,7 +9,6 @@ SEARCH_DIRS = [ROOT / "competition"]
 
 
 def _read_info(d: Path) -> dict:
-    """info.yml 이 있으면 파싱해서 dict 로. 없으면 빈 dict."""
     f = d / "info.yml"
     if not f.exists():
         return {}
@@ -35,7 +21,7 @@ def _read_info(d: Path) -> dict:
 
 @st.cache_data(show_spinner=False)
 def catalog() -> pd.DataFrame:
-    """all.parquet 을 가진 하위 디렉터리를 수집. 앞쪽 SEARCH_DIRS 우선."""
+    """all.parquet 을 가진 디렉터리만 수집. name 기준 중복은 앞쪽 dir 우선."""
     rows, seen = [], set()
     for base in SEARCH_DIRS:
         if not base.is_dir():
@@ -94,10 +80,24 @@ def load_df(name: str) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def schema_of(name: str) -> pd.DataFrame:
-    """parquet 메타데이터만으로 컬럼/타입 표를 만든다 (전체 로드 안 함)."""
+    """전체 로드 없이 parquet 메타데이터만으로 스키마를 만든다.
+
+    non-null 은 row group 통계의 null_count 합으로 구하고,
+    통계가 없으면 -1 로 둔다(80종 중 일부는 통계가 비어 있을 수 있음).
+    """
     pf = pq.ParquetFile(table_path(name))
-    arrow = pf.schema_arrow
+    md, arrow = pf.metadata, pf.schema_arrow
+    nulls = {c: 0 for c in arrow.names}
+    ok = True
+    for g in range(md.num_row_groups):
+        rg = md.row_group(g)
+        for i in range(rg.num_columns):
+            col = rg.column(i)
+            leaf = col.path_in_schema.split(".")[0]
+            if col.statistics is None or col.statistics.null_count is None:
+                ok = False
+            elif leaf in nulls:
+                nulls[leaf] += col.statistics.null_count
     return pd.DataFrame({
-        "column": arrow.names,
-        "dtype":  [str(t) for t in arrow.types],
-    })
+        "column":   arrow.names,
+        "dtype":    [str(t) for t in arrow.types]})

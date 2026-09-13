@@ -1,20 +1,10 @@
-"""예산 추가 신청/승인 워크플로우.
-
-분석가는 create() 로 신청을 남기고, 관리자는 decide() 로 결재한다.
-승인이 통과하면 db.grant_eps() 를 호출해 해당 분석가의 개인 상한을 증액.
+"""예산 추가 신청/승인 워크플로우 저장소.
 
 Status 값
-    pending     관리자 검토 대기
-    approved    요청 그대로 승인
-    partial     관리자가 금액을 조정해 부분 승인
-    rejected    거절
-
-주요 API
-    create(user, db_name, requested, reason) → 신청 id
-    list_by_user(user)                       → 분석가의 신청 목록
-    list_all(status=?, user=?)               → 관리자용 전체 조회 (필터 지원)
-    decide(req_id, reviewer, status, approved=?, note=?)  → 결재
-    stats()                                  → 상태별 카운트 스냅샷
+  pending    → 관리자 검토 대기
+  approved   → 요청한 만큼 전액 승인
+  partial    → 관리자가 금액을 조정해 일부만 승인
+  rejected   → 거절
 """
 from __future__ import annotations
 import datetime as dt
@@ -26,10 +16,9 @@ def _now() -> str:
     return dt.datetime.now().isoformat(timespec="seconds")
 
 
-# ── 분석가 API ────────────────────────────────────────────
+# ── 분석가 API ───────────────────────────────────────────────────────
 
 def create(username: str, db_name: str, requested: float, reason: str) -> int:
-    """신청 생성. 초기 status='pending'."""
     with db.connect() as con:
         cur = con.execute(
             "INSERT INTO budget_requests "
@@ -41,7 +30,6 @@ def create(username: str, db_name: str, requested: float, reason: str) -> int:
 
 
 def list_by_user(username: str) -> list[dict]:
-    """이 분석가가 낸 신청들, 최근순."""
     with db.connect() as con:
         rows = con.execute(
             "SELECT * FROM budget_requests WHERE username = ? "
@@ -50,11 +38,10 @@ def list_by_user(username: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-# ── 관리자 API ────────────────────────────────────────────
+# ── 관리자 API ───────────────────────────────────────────────────────
 
 def list_all(status: Optional[str] = None,
              user: Optional[str] = None) -> list[dict]:
-    """전체 신청 조회. pending 이 먼저, 그 뒤 최근순."""
     q = "SELECT * FROM budget_requests WHERE 1=1"
     params: list = []
     if status and status != "전체":
@@ -72,10 +59,7 @@ def list_all(status: Optional[str] = None,
 
 def decide(req_id: int, *, reviewer: str, status: str,
            approved: float = 0.0, note: str = "") -> dict:
-    """결재.
-    status ∈ {approved, partial, rejected}.
-    approved > 0 이면 신청자 users.eps_cap 을 그만큼 증액한다.
-    """
+    """status: approved|partial|rejected. approved>0 이면 사용자 eps_cap 을 증액한다."""
     assert status in {"approved", "partial", "rejected"}
     with db.connect() as con:
         row = con.execute(
@@ -102,7 +86,6 @@ def decide(req_id: int, *, reviewer: str, status: str,
 
 
 def stats() -> dict:
-    """상태별 카운트: {'pending': N, 'approved': N, 'partial': N, 'rejected': N}."""
     with db.connect() as con:
         rows = con.execute(
             "SELECT status, COUNT(*) c FROM budget_requests GROUP BY status"

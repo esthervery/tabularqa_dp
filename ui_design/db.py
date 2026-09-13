@@ -1,30 +1,9 @@
-"""계정 · 예산 신청 · 운영 정책 저장소 (SQLite).
+"""데모용 계정 & 예산 신청 & 운영 정책 저장소.
 
-분석 대상 데이터(parquet)와 완전히 분리된 dp_demo.db 파일을 쓴다.
-
-테이블 3개
-    users            로그인 계정 + 사용자별 개인 ε 상한
-    budget_requests  분석가의 ε 증액 신청 워크플로우 (pending/approved/partial/rejected)
-    dp_policy        (DB x query_type) 조합별 운영 규칙
-                     is_draft=1  → 관리자 실험 중 (아무에게도 적용 안 됨)
-                     is_draft=0  → 확정 (그 시점부터 모든 분석가에게 적용)
-
-주요 API
-    init()                              스키마 준비 + 데모 계정 seed
-    verify(username, password)          로그인 검증
-    create_user(...)                    회원가입
-    get_eps_cap(username)               개인 상한 조회
-    grant_eps(username, extra)          개인 상한 증액 (관리자 결재 시)
-
-    get_active_policy(db, qt)           조합의 확정 정책 (없으면 DEFAULT_POLICY)
-    list_active_policies()              {(db, qt): policy} 매트릭스 뷰용
-    get_draft_policy(admin, db, qt)     관리자의 실험용 draft (없으면 active seed)
-    list_draft_policies(admin)          이 관리자의 모든 draft
-    save_draft(admin, ...)              draft 저장/갱신
-    confirm_draft(admin, db, qt)        단일 조합 draft → active 승격
-    confirm_all_drafts(admin)           모든 draft 한 번에 승격 (배치 확정)
-    discard_draft(admin, db=?, qt=?)    draft 삭제
-    policy_history(limit=?)             확정 이력
+분석 대상 데이터(parquet)와는 완전히 분리된 SQLite 파일.
+- users: 로그인 계정 + 사용자별 개인 ε 상한
+- budget_requests: 분석가가 예산 증액을 신청하고 관리자가 결재하는 워크플로우
+- dp_policy: 관리자가 실험 후 '확정' 한 운영 규칙 (분석가 계정 전체에 적용)
 """
 import datetime as dt
 import hashlib
@@ -36,11 +15,10 @@ from pathlib import Path
 
 
 DB_PATH = Path(__file__).resolve().parent.parent / "dp_demo.db"
-ITERATIONS = 200_000    # pbkdf2 반복 횟수 (데모라 짧게)
+ITERATIONS = 200_000
 
-# UI 드롭다운·정책 스코프에서 동일하게 참조하는 유일한 소스.
+# 지원하는 질의 유형. 이 값은 policy 스코프, agent_qa 드롭다운에 모두 쓰인다.
 QUERY_TYPES = ("mean", "count", "sum", "variance", "max")
-
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -69,11 +47,13 @@ CREATE TABLE IF NOT EXISTS budget_requests (
 CREATE INDEX IF NOT EXISTS ix_req_user   ON budget_requests(username);
 CREATE INDEX IF NOT EXISTS ix_req_status ON budget_requests(status);
 
+-- 운영 정책. 관리자가 privacy 페이지에서 실험 후 '확정' 하면 여기 스냅샷으로 남고
+-- 그 시점부터 모든 분석가에게 적용된다. 확정 레코드가 하나도 없으면 DEFAULT_POLICY 사용.
 CREATE TABLE IF NOT EXISTS dp_policy (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     db_name           TEXT NOT NULL,
-    query_type        TEXT NOT NULL,           -- QUERY_TYPES 중 하나
-    is_draft          INTEGER NOT NULL DEFAULT 1,  -- 1=실험중, 0=확정
+    query_type        TEXT NOT NULL,      -- mean|count|sum|variance|max
+    is_draft          INTEGER NOT NULL DEFAULT 1,   -- 1=실험중, 0=확정
     eps_per_query     REAL NOT NULL,
     eps_cap_default   REAL NOT NULL,
     target_rel_width  REAL NOT NULL,
@@ -87,32 +67,25 @@ CREATE INDEX IF NOT EXISTS ix_policy_scope
     ON dp_policy(db_name, query_type, is_draft);
 """
 
-
-# 확정된 정책이 없을 때 fallback 으로 반환되는 기본값.
+# 확정된 정책이 없을 때 fallback.
 DEFAULT_POLICY = {
     "id":               None,
-    "db_name":          "*",       # 매치 안 되는 sentinel
+    "db_name":          "*",     # 의미상 fallback (매치 안 됨)
     "query_type":       "*",
     "is_draft":         False,
     "eps_per_query":    0.5,
-    "eps_cap_default":  10.0,
+    "eps_cap_default": 10.0,
     "target_rel_width": 0.01,
     "step":             1.2,
     "admin":            None,
     "updated_at":       None,
     "confirmed_at":     None,
-    "note":             "default (해당 조합에 확정 정책이 없음)",
+    "note":             "default (해당 (DB, query_type) 조합에 확정된 정책이 없음)",
 }
 
 
-# ── 커넥션 / 마이그레이션 유틸 ────────────────────────────────
-
 @contextmanager
-# "with connect() as con:"으로 SQLite DB에 연결해서 쓸 수 있고, 작업 끝나면 자동으로 commit 후 연결을 닫음
 def connect():
-    """호출마다 새 커넥션. Streamlit 이 스레드에서 스크립트를 재실행하므로
-    커넥션을 전역/캐시로 들고 있지 않는다."""
-    # 로컬 DB "dp_demo.db"와 연결
     con = sqlite3.connect(DB_PATH, timeout=10)
     con.row_factory = sqlite3.Row
     try:
@@ -123,30 +96,31 @@ def connect():
 
 
 def _ensure_column(con, table: str, col: str, ddl: str) -> None:
-    """ALTER TABLE ADD COLUMN 을 idempotent 하게 수행."""
     cur = con.execute(f"PRAGMA table_info({table})")
     if col not in {r[1] for r in cur.fetchall()}:
         con.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
 
 
 def init(seed_demo: bool = True) -> None:
-    """스키마 준비 + (원한다면) 데모 계정 seed."""
     with connect() as con:
-        # sqlite3 라이브러리에서 제공. 여러 SQL 문을 한 번에 실행
         con.executescript(SCHEMA)
-        # 이전 버전과의 호환. 컬럼이 없으면 추가.
-        # users 테이블에 eps_cap 컬럼이 없으면 → REAL NOT NULL DEFAULT 10.0으로 추가
         _ensure_column(con, "users", "eps_cap",
                        "eps_cap REAL NOT NULL DEFAULT 10.0")
 
-        # 컬럼을 새로 추가할 때 아무 값도 지정되지 않으면 자동으로 __legacy__라는 텍스트가 들어가도록 해서,
-        # 이 레코드가 새 정책이 아니라 예전 방식에서 온 것임을 구분
+        # dp_policy 의 새 컬럼 마이그레이션 (기존 스키마에 없으면 추가).
+        # 기존 레코드에는 임시 값 '__legacy__' 가 들어가지만, 매치되지
+        # 않으므로 자연스레 DEFAULT_POLICY 로 fallback 된다.
         _ensure_column(con, "dp_policy", "db_name",
                        "db_name TEXT NOT NULL DEFAULT '__legacy__'")
         _ensure_column(con, "dp_policy", "query_type",
                        "query_type TEXT NOT NULL DEFAULT '__legacy__'")
 
-    # seed_demo가 켜져 있으면, DB에 기본 데모 계정(analyst, admin)이 없을 때 자동으로 만들어주는 초기화 로직
+        if seed_demo:
+            if not user_exists("analyst"):
+                create_user("analyst", "demo1234", is_admin=False)
+            if not user_exists("admin"):
+                create_user("admin",   "admin1234", is_admin=True)
+
     if seed_demo:
         if not user_exists("analyst"):
             create_user("analyst", "demo1234", is_admin=False)
@@ -154,17 +128,14 @@ def init(seed_demo: bool = True) -> None:
             create_user("admin",   "admin1234", is_admin=True)
 
 
-# ── 비밀번호 파생 ────────────────────────────────────────────
-
 def _derive(password: str, salt_hex: str) -> str:
-    """pbkdf2-sha256 로 비밀번호 → 해시 16진 문자열."""
     return hashlib.pbkdf2_hmac(
         "sha256", password.encode("utf-8"),
         bytes.fromhex(salt_hex), ITERATIONS,
     ).hex()
 
 
-# ── users ────────────────────────────────────────────────────
+# ── users ────────────────────────────────────────────────────────────
 
 def user_exists(username: str) -> bool:
     with connect() as con:
@@ -176,15 +147,16 @@ def user_exists(username: str) -> bool:
 def create_user(username: str, password: str,
                 is_admin: bool = False,
                 eps_cap: float | None = None) -> tuple[bool, str]:
-    """신규 계정 생성. 초기 eps_cap 은 DEFAULT_POLICY 값을 사용."""
     username = username.strip()
     if not username or not password:
         return False, "아이디와 비밀번호를 입력하세요."
     if len(password) < 8:
         return False, "비밀번호는 8자 이상이어야 합니다."
+    # 신규 사용자 초기 상한 = 시스템 기본 정책의 eps_cap_default.
+    # (DB×query_type 조합별 정책은 실 사용 시점에 조회되므로 여기선
+    #  스코프를 특정하지 않는다.)
     if eps_cap is None:
         eps_cap = DEFAULT_POLICY["eps_cap_default"]
-
     salt = secrets.token_hex(16)
     try:
         with connect() as con:
@@ -202,7 +174,7 @@ def create_user(username: str, password: str,
 
 
 def verify(username: str, password: str):
-    """로그인 검증. 성공 시 {'username', 'is_admin', 'eps_cap'}, 실패 시 None."""
+    """성공하면 {'username', 'is_admin', 'eps_cap'}, 실패하면 None."""
     with connect() as con:
         row = con.execute(
             "SELECT username, salt, pw_hash, is_admin, eps_cap "
@@ -231,7 +203,6 @@ def verify(username: str, password: str):
 
 
 def get_eps_cap(username: str) -> float:
-    """개인 상한 조회."""
     with connect() as con:
         row = con.execute(
             "SELECT eps_cap FROM users WHERE username = ?", (username,)
@@ -240,9 +211,8 @@ def get_eps_cap(username: str) -> float:
 
 
 def grant_eps(username: str, extra: float) -> float:
-    """개인 상한을 extra 만큼 증액하고 새 상한 반환.
-
-    관리자의 예산 신청 승인 시 사용한다. 운영 정책과는 완전히 별개."""
+    """개인 상한을 `extra` 만큼 증액하고 새 상한 반환.
+    관리자의 예산 신청 승인 시 사용. 운영 정책과는 무관하다."""
     with connect() as con:
         con.execute(
             "UPDATE users SET eps_cap = eps_cap + ? WHERE username = ?",
@@ -262,13 +232,13 @@ def list_users() -> list[sqlite3.Row]:
         ).fetchall()
 
 
-# ── dp_policy ────────────────────────────────────────────────
-# 데이터 흐름:
+# ── policy (운영 규칙) ────────────────────────────────────────────────
+# 흐름:
 #   1) 관리자가 privacy 페이지에서 슬라이더/라운드 실험 → save_draft()
-#      → is_draft=1 레코드가 (admin, db, qt) 조합당 하나씩 유지.
-#   2) 결과가 만족스러우면 [확정] → confirm_draft() 또는 confirm_all_drafts()
-#      → is_draft=0 으로 승격 (confirmed_at 채움). 그 시점부터 분석가에게 적용.
-#   3) 확정 정책이 하나도 없으면 DEFAULT_POLICY 가 fallback.
+#      (is_draft=1 레코드가 관리자별로 하나 유지됨)
+#   2) 결과가 만족스러우면 [확정] → confirm_draft()
+#      → is_draft=0 으로 승격, 그 시점부터 분석가에게 적용
+#   3) 확정된 정책이 하나도 없으면 DEFAULT_POLICY 가 fallback.
 
 def _row_to_policy(row) -> dict:
     return {
@@ -288,7 +258,8 @@ def _row_to_policy(row) -> dict:
 
 
 def get_active_policy(db_name: str, query_type: str) -> dict:
-    """(db, qt) 의 활성(확정) 정책. 없으면 DEFAULT_POLICY 를 반환."""
+    """(db_name, query_type) 조합의 활성(확정) 정책.
+    없으면 DEFAULT_POLICY 를 db_name/query_type 만 채워 반환."""
     with connect() as con:
         row = con.execute(
             "SELECT * FROM dp_policy "
@@ -305,23 +276,23 @@ def get_active_policy(db_name: str, query_type: str) -> dict:
 
 
 def list_active_policies() -> dict:
-    """{(db, qt): policy_dict}. 매트릭스 뷰용. 최신 confirmed_at 하나만 유지."""
+    """{(db_name, query_type): policy_dict} 매트릭스 뷰용."""
     with connect() as con:
         rows = con.execute(
             "SELECT * FROM dp_policy WHERE is_draft = 0 "
             "ORDER BY db_name, query_type, confirmed_at DESC"
         ).fetchall()
-    out: dict[tuple[str, str], dict] = {}
+    out = {}
     for r in rows:
         key = (r["db_name"], r["query_type"])
-        if key not in out:
-            out[key] = _row_to_policy(r)
+        if key in out:      # 최신 confirmed_at 하나만 유지
+            continue
+        out[key] = _row_to_policy(r)
     return out
 
 
 def get_draft_policy(admin: str, db_name: str, query_type: str) -> dict:
-    """이 관리자의 (db, qt) draft. 없으면 active(또는 default) 값으로 seed."""
-    # 관리자끼리는 설정을 공유하도록 코드 변경해야 함.
+    """관리자의 (db, qt) 실험용 draft. 없으면 현재 active(또는 default) 로 seed."""
     with connect() as con:
         row = con.execute(
             "SELECT * FROM dp_policy "
@@ -332,22 +303,19 @@ def get_draft_policy(admin: str, db_name: str, query_type: str) -> dict:
         ).fetchone()
     if row is not None:
         return _row_to_policy(row)
-
     seed = get_active_policy(db_name, query_type)
-    seed["is_draft"] = True
-    seed["admin"]    = admin
-    seed["id"]       = None
+    seed["is_draft"]  = True
+    seed["admin"]     = admin
+    seed["id"]        = None
     return seed
 
 
 def list_draft_policies(admin: str) -> list[dict]:
-    """특정 관리자(admin)가 만든 모든 draft 정책들을 DB에서 조회해서, 파이썬 dict 리스트로 반환하는 함수"""
+    """관리자가 현재 갖고 있는 모든 draft (배치 확정용 큐)."""
     with connect() as con:
         rows = con.execute(
-            # dp_policy 테이블에서 is_draft=1이고 admin이 해당 관리자 이름(?)인 행들을 가져옴
             "SELECT * FROM dp_policy WHERE is_draft = 1 AND admin = ? "
             "ORDER BY db_name, query_type",
-            # # ?(플레이스홀더)에 들어가는 값이 admin(튜플 형태라 콤마(,)필요)
             (admin,),
         ).fetchall()
     return [_row_to_policy(r) for r in rows]
@@ -379,7 +347,6 @@ def save_draft(admin: str, *, db_name: str, query_type: str,
                  admin, now, note),
             )
             return int(cur.lastrowid)
-
         con.execute(
             "UPDATE dp_policy SET "
             "  eps_per_query = ?, eps_cap_default = ?, "
@@ -394,7 +361,7 @@ def save_draft(admin: str, *, db_name: str, query_type: str,
 
 def confirm_draft(admin: str, db_name: str, query_type: str,
                   note: str | None = None) -> dict:
-    """단일 draft 를 활성 정책으로 승격."""
+    """단일 (db, qt) draft 를 활성 정책으로 승격."""
     now = dt.datetime.now().isoformat(timespec="seconds")
     with connect() as con:
         row = con.execute(
@@ -405,8 +372,9 @@ def confirm_draft(admin: str, db_name: str, query_type: str,
             (admin, db_name, query_type),
         ).fetchone()
         if row is None:
-            raise ValueError(f"확정할 draft 가 없습니다: {db_name}/{query_type}")
-
+            raise ValueError(
+                f"확정할 draft 가 없습니다: {db_name}/{query_type}"
+            )
         con.execute(
             "UPDATE dp_policy SET is_draft = 0, confirmed_at = ?, "
             "  note = COALESCE(?, note) "
@@ -421,7 +389,7 @@ def confirm_draft(admin: str, db_name: str, query_type: str,
 
 def confirm_all_drafts(admin: str,
                        note: str | None = None) -> list[dict]:
-    """이 관리자가 만든 모든 draft 를 한꺼번에 승격."""
+    """관리자가 만든 모든 draft 를 한꺼번에 승격 (배치 확정)."""
     drafts = list_draft_policies(admin)
     return [
         confirm_draft(admin, d["db_name"], d["query_type"], note=note)
@@ -432,7 +400,7 @@ def confirm_all_drafts(admin: str,
 def discard_draft(admin: str,
                   db_name: str | None = None,
                   query_type: str | None = None) -> None:
-    """draft 삭제. 인자를 생략하면 이 관리자의 모든 draft 를 지운다."""
+    """db_name/query_type 을 지정하면 그 조합만, 둘 다 None 이면 전체 draft 삭제."""
     q = "DELETE FROM dp_policy WHERE is_draft = 1 AND admin = ?"
     params: list = [admin]
     if db_name is not None:
@@ -448,7 +416,6 @@ def discard_draft(admin: str,
 def policy_history(limit: int = 20,
                    db_name: str | None = None,
                    query_type: str | None = None) -> list[dict]:
-    """확정 이력 (최신 confirmed_at 순)."""
     q = "SELECT * FROM dp_policy WHERE is_draft = 0"
     params: list = []
     if db_name:
@@ -459,7 +426,6 @@ def policy_history(limit: int = 20,
         params.append(query_type)
     q += " ORDER BY confirmed_at DESC LIMIT ?"
     params.append(int(limit))
-
     with connect() as con:
         rows = con.execute(q, params).fetchall()
     return [_row_to_policy(r) for r in rows]
