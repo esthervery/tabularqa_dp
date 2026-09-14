@@ -2,7 +2,7 @@
 import os, time
 import pandas as pd
 import streamlit as st
-from ui import catalog
+from ui_design import catalog
 
 DB_CHOICES = catalog.names()          # data/ + competition/ 스캔 결과
 

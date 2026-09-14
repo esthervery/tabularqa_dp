@@ -8,7 +8,7 @@
 import random
 import pandas as pd
 import streamlit as st
-from ui import agent_bridge as ab, db, state, theme
+from ui_design import agent_bridge as ab, db, state, theme
 
 theme.inject_global_css()
 

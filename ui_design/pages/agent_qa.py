@@ -6,7 +6,7 @@
   [Bottom]   st.chat_input 자연어 질문
 """
 import streamlit as st
-from ui import agent_bridge as ab, db, state, theme
+from ui_design import agent_bridge as ab, db, state, theme
 
 theme.inject_global_css()
 

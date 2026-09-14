@@ -1,6 +1,6 @@
 """📝 분석가 뷰: 예산 추가 신청 + 내 신청 이력."""
 import streamlit as st
-from ui import agent_bridge as ab, requests as reqs, state, theme
+from ui_design import agent_bridge as ab, requests as reqs, state, theme
 
 theme.inject_global_css()
 state.apply_active_policy()

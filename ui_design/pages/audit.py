@@ -4,7 +4,7 @@
 '예산 신청 결재' 워크플로우가 주된 기능이 된다.
 """
 import streamlit as st
-from ui import requests as reqs, state, theme
+from ui_design import requests as reqs, state, theme
 
 theme.inject_global_css()
 

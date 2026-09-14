@@ -9,7 +9,7 @@ Status 값
 from __future__ import annotations
 import datetime as dt
 from typing import Optional
-from ui import db
+from ui_design import db
 
 
 def _now() -> str:

@@ -1,5 +1,5 @@
 import streamlit as st
-from ui import db, state, theme
+from ui_design import db, state, theme
 
 
 HERO_HTML = """

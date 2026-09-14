@@ -1,6 +1,6 @@
 # streamlit 데모 진입점
 import streamlit as st
-from ui import auth, db, state, theme
+from ui_design import auth, db, state, theme
 
 # ── 로그인 여부에 따라 페이지 옵션이 달라져야 하므로
 #    st.set_page_config 를 조건부로 호출한다.
