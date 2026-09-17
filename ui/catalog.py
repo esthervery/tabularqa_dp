@@ -33,6 +33,17 @@ def _read_info(d: Path) -> dict:
         return {}
 
 
+CATALOG_COLUMNS = [
+    "name",
+    "title",
+    "domain",
+    "source",
+    "n_rows",
+    "n_cols",
+    "path",
+]
+
+
 @st.cache_data(show_spinner=False)
 def catalog() -> pd.DataFrame:
     """all.parquet 을 가진 하위 디렉터리를 수집. 앞쪽 SEARCH_DIRS 우선."""
@@ -60,22 +71,31 @@ def catalog() -> pd.DataFrame:
                 "n_cols": n_cols,
                 "path":   str(p),
             })
-    return pd.DataFrame(rows)
+
+    df = pd.DataFrame(rows, columns=CATALOG_COLUMNS)
+    return df
 
 
 def names(domain: str | None = None) -> list[str]:
     c = catalog()
+    if c.empty or "domain" not in c.columns:
+        return []
     if domain and domain != "전체":
         c = c[c["domain"] == domain]
     return c["name"].tolist()
 
 
 def domains() -> list[str]:
-    return ["전체"] + sorted(catalog()["domain"].unique().tolist())
+    c = catalog()
+    if c.empty or "domain" not in c.columns:
+        return ["전체"]
+    return ["전체"] + sorted(c["domain"].dropna().astype(str).unique().tolist())
 
 
 def meta(name: str) -> dict:
     c = catalog()
+    if c.empty or "name" not in c.columns:
+        return {}
     hit = c[c["name"] == name]
     return {} if hit.empty else hit.iloc[0].to_dict()
 

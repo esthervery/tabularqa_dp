@@ -62,7 +62,7 @@ def _render_schema_panel() -> None:
                            label_visibility="collapsed")
         view = sch[sch["column"].str.contains(kw, case=False)] if kw else sch
         st.dataframe(
-            view, hide_index=True, width="stretch",
+            view, hide_index=True, use_container_width=True,
             height=min(38 * (len(view) + 1) + 3, 400),
             column_config={
                 "column": st.column_config.TextColumn("컬럼", width=140),
@@ -160,7 +160,7 @@ def _render_manual_tab() -> None:
         help="`return` 으로 스칼라 값을 반환하는 함수 본문을 작성하세요.",
     )
     b1, b2 = st.columns([1, 2], vertical_alignment="center")
-    if b1.button("▶ 실행", width="stretch", type="primary",
+    if b1.button("▶ 실행", type="primary", use_container_width=True,
                  key="run_manual"):
         _run_manual_code()
     b2.caption(f"실행 시 ε = {st.session_state.eps:.2f} 소모")
