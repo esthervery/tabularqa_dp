@@ -23,13 +23,12 @@ Renders (위→아래):
     manual_code   : 수동 편집기 텍스트 (에이전트 결과도 여기 반영됨)
     last_result   : {value, ok, src, calls} — 결과 표시용
 """
+import html
+
 import streamlit as st
 from ui import agent_bridge as ab, db, state, theme
 
 theme.inject_global_css()
-
-# 현재 (DB × query_type) 정책 + 개인 상한을 세션에 반영
-state.apply_active_policy()
 
 
 # ─────────────────────────────────────────────────────────
@@ -71,12 +70,27 @@ def _render_schema_panel() -> None:
         )
 
 
+def _stream_compact_code(stream) -> str:
+    """생성 코드를 작은 고정폭 글꼴로 스트리밍해 표시한다."""
+    placeholder = st.empty()
+    chunks: list[str] = []
+    for chunk in stream:
+        chunks.append(chunk)
+        placeholder.markdown(
+            "<pre style=\"margin:0; font-size:0.78rem; line-height:1.45; "
+            "white-space:pre-wrap; overflow-wrap:anywhere;\">"
+            f"{html.escape(''.join(chunks))}</pre>",
+            unsafe_allow_html=True,
+        )
+    return "".join(chunks)
+
+
 def _run_agent_streaming(slot, q: str) -> None:
     """pending_q 를 에이전트에 넘겨 코드를 스트리밍 → 실행 → 결과 저장."""
     with slot.container():
         with st.status("에이전트가 코드를 작성 중…", expanded=True) as stt:
             st.caption("① 스키마로 프롬프트 구성 (원본 레코드 미포함)")
-            code = st.write_stream(
+            code = _stream_compact_code(
                 ab.stream_code(q, st.session_state.db_name)
             )
             trace = st.session_state.get("_last_trace", {})
@@ -223,6 +237,13 @@ with st.session_state.nav_slot:
         format_func=lambda n: f"{n} · {ab.catalog.meta(n)['title'][:26]}",
         label_visibility="collapsed",
     )
+
+    # 선택 위젯이 세션의 db_name 을 갱신한 뒤에 정책을 읽어야 한다.
+    # 그렇지 않으면 DB를 바꾼 첫 rerun 에서는 직전 DB의 ε 정책이 화면에
+    # 남을 수 있다. 개인 상한도 이 시점에 users 테이블에서 다시 동기화한다.
+    ACTIVE_POLICY = state.apply_active_policy(
+        st.session_state.db_name, st.session_state.query_type
+    )
     # ===qa 페이지에는 필요 없는 코드=== + 쿼리 타입은 기본 mean으로 설정됨
     # if st.session_state.is_admin:
     #     st.selectbox(
@@ -253,7 +274,13 @@ with head_l:
     st.title("DP Agent Console")
     st.caption("질문 → 코드 생성 → 샌드박스 실행 → ε 원장 기록")
 with head_r:
+    _meta = ab.catalog.meta(st.session_state.db_name)
     st.write(f"**DB** · `{st.session_state.db_name}`")
+    st.caption(
+        f"{_meta.get('title', st.session_state.db_name)} · "
+        f"{int(_meta.get('n_rows', 0)):,} rows · "
+        f"{int(_meta.get('n_cols', 0))} columns"
+    )
 
 
 # ── KPI 3개 (도넛 게이지 + metric 2개) ──────────────────
@@ -278,10 +305,17 @@ with g1:
 with g2:
     _n_queries = sum(1 for m in st.session_state.messages if m["role"] == "user")
     st.metric("Queries (session)", _n_queries,
-              help=f"질의당 ε · {st.session_state.eps:.2f}")
+              help=f"DB 활성 정책의 질의당 ε · {st.session_state.eps:.2f}")
 with g3:
-    st.metric("Data access", "Sandbox",
-              help="원본 레코드 직접 접근 불가")
+    st.metric("DB personal cap", f"{_eps_cap:.2f} ε",
+              help="users 테이블의 로그인 사용자 개인 ε 상한입니다.")
+
+st.caption(
+    f"정책 기준 · {ACTIVE_POLICY['db_name']}/{ACTIVE_POLICY['query_type']} · "
+    f"질의당 {ACTIVE_POLICY['eps_per_query']:.2f} ε · "
+    + ("확정 정책" if ACTIVE_POLICY["id"] is not None else "기본 정책 (확정 정책 없음)")
+    + " · 누적 소모와 질의 수는 현재 브라우저 세션 값입니다."
+)
 
 
 st.divider()
