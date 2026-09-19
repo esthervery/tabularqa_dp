@@ -251,7 +251,7 @@ with st.container(border=True):
     c1, c2, c3 = st.columns([1, 1, 3], vertical_alignment="center")
     with c1:
         if st.button("▶ 라운드 실험", type="primary",
-                     width="stretch",
+                     use_container_width=True,
                      disabled=(lab_spent + next_alloc > d_cap + 1e-9)):
             # TODO: run_fixed_k / explore 실제 연결 지점.
             # 지금은 목업으로 step 배율만큼 상대폭이 줄어드는 시뮬레이션.
@@ -265,7 +265,7 @@ with st.container(border=True):
             })
             st.rerun()
     with c2:
-        if st.button("↺ 로그 초기화", width="stretch"):
+        if st.button("↺ 로그 초기화", use_container_width=True):
             st.session_state.rounds_by_scope[SCOPE] = []
             st.rerun()
     with c3:
@@ -285,7 +285,7 @@ if rounds:
     with left:
         st.caption("Rounds")
         st.dataframe(
-            df, width="stretch", hide_index=True,
+            df, use_container_width=True, hide_index=True,
             column_config={
                 "round":     st.column_config.NumberColumn("ROUND",     width="small"),
                 "alloc":     st.column_config.NumberColumn("ALLOC ε",   format="%.3f"),
@@ -297,7 +297,7 @@ if rounds:
         st.caption("Relative width vs target")
         chart_df = df.set_index("round")[["rel_width"]].copy()
         chart_df["target"] = d_tgt
-        st.line_chart(chart_df, width="stretch")
+        st.line_chart(chart_df, use_container_width=True)
 else:
     st.info("아직 실험된 라운드가 없습니다. **▶ 라운드 실험**으로 시작하세요.")
 
@@ -318,7 +318,7 @@ with st.container(border=True):
     c1, c2, c3 = st.columns([1.2, 1.2, 1.2])
     with c1:
         if st.button("✓ 이 조합만 확정", type="primary",
-                     width="stretch",
+                     use_container_width=True,
                      disabled=(not has_diff())):
             new_active = db.confirm_draft(
                 ME, DBNAME, QTYPE, note=note or None,
@@ -335,7 +335,7 @@ with st.container(border=True):
     with c2:
         _n_all = len(db.list_draft_policies(ME))
         if st.button(f"⇈ 배치 확정 ({_n_all})",
-                     width="stretch",
+                     use_container_width=True,
                      disabled=(_n_all == 0)):
             confirmed = db.confirm_all_drafts(ME, note=note or None)
             state.log("policy_batch_confirm", f"{len(confirmed)} drafts")
@@ -344,7 +344,7 @@ with st.container(border=True):
                        icon="✅")
             st.rerun()
     with c3:
-        if st.button("↺ 이 조합 초기화", width="stretch"):
+        if st.button("↺ 이 조합 초기화", use_container_width=True):
             db.discard_draft(ME, DBNAME, QTYPE)
             st.session_state.pop("_policy_loaded_scope", None)
             st.rerun()
@@ -377,7 +377,7 @@ for _dn in ab.catalog.names():
             "step":    _pol["step"]             if _pol else db.DEFAULT_POLICY["step"],
             "확정 시각":_pol["confirmed_at"]     if _pol else "—",
         })
-st.dataframe(pd.DataFrame(_rows), width="stretch", hide_index=True)
+st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
 
 
 # ── Draft queue ──────────────────────────────────────────
@@ -398,14 +398,14 @@ else:
             with cB:
                 if st.button("✓ 확정",
                              key=f"cf_{d['db_name']}_{d['query_type']}",
-                             width="stretch", type="primary"):
+                             type="primary", use_container_width=True):
                     db.confirm_draft(ME, d["db_name"], d["query_type"])
                     st.session_state.pop("_policy_loaded_scope", None)
                     st.rerun()
             with cC:
                 if st.button("삭제",
                              key=f"dl_{d['db_name']}_{d['query_type']}",
-                             width="stretch"):
+                             use_container_width=True):
                     db.discard_draft(ME, d["db_name"], d["query_type"])
                     st.session_state.pop("_policy_loaded_scope", None)
                     st.rerun()
@@ -433,5 +433,5 @@ else:
             "step":             "step",
             "note":             "노트",
         }),
-        width="stretch", hide_index=True,
+        use_container_width=True, hide_index=True,
     )

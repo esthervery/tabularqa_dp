@@ -55,7 +55,7 @@ def _render_login_form() -> None:
         u = st.text_input("아이디", value="analyst")
         p = st.text_input("비밀번호", type="password", placeholder="8자 이상")
         submitted = st.form_submit_button(
-            "로그인", width="stretch", type="primary",
+            "로그인", type="primary", use_container_width=True,
         )
         if not submitted:
             return
@@ -81,7 +81,7 @@ def _render_signup_form() -> None:
         p1 = st.text_input("비밀번호 ", type="password", help="8자 이상")
         p2 = st.text_input("비밀번호 확인", type="password")
 
-        if not st.form_submit_button("가입", width="stretch"):
+        if not st.form_submit_button("가입", use_container_width=True):
             return
 
         if p1 != p2:
