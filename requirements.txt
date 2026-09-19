@@ -9,3 +9,4 @@ ollama
 pyyaml
 openai
 streamlit
+matplotlib
