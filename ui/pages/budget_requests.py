@@ -105,7 +105,7 @@ with st.container(border=True):
             height=110,
         )
         submitted = st.form_submit_button(
-            "신청 제출", type="primary", width="stretch",
+            "신청 제출", type="primary", use_container_width=True,
         )
         if submitted:
             if not reason.strip():
