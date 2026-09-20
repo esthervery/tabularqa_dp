@@ -351,7 +351,7 @@ def _render_sidebar_chat_history() -> None:
 
 def _render_schema_panel() -> None:
     with st.container(border=True, height=540):
-        st.subheader("🔒 Schema")
+        st.subheader("Schema")
         try:
             sch = ab.schema_of(st.session_state.db_name)
         except Exception as e:
@@ -495,7 +495,7 @@ def _render_result_metrics() -> None:
 
 def _render_editor_panel() -> None:
     with st.container(border=True, height=540):
-        tab_agent, tab_manual = st.tabs(["🤖 Agent", "✍️ 수동 편집"])
+        tab_agent, tab_manual = st.tabs(["💬 에이전트 모드", "⌨️ 수동 입력 모드"])
         with tab_agent:
             _render_agent_tab()
         with tab_manual:
@@ -512,25 +512,8 @@ with st.session_state.nav_slot:
     if not st.session_state.is_admin:
         st.caption("Chat history")
         _render_sidebar_chat_history()
+        st.divider()
 
-
-# ── Query target · 대상 DB 선택 ────────────────
-with st.container(border=True):
-    st.subheader("Query target · 질의 대상 DB")
-    sel_l, sel_r = st.columns([1, 2])
-    with sel_l:
-        dom = st.selectbox("도메인", ab.catalog.domains(), key="db_domain")
-    with sel_r:
-        choices = ab.catalog.names(dom)
-        if not choices:
-            st.error("`competition/` 아래에서 `all.parquet` 을 찾지 못했습니다.")
-            st.stop()
-        if st.session_state.db_name not in choices:
-            st.session_state.db_name = choices[0]
-        st.selectbox(
-            "Database", choices, key="db_name",
-            format_func=lambda n: f"{n} · {ab.catalog.meta(n)['title'][:40]}",
-        )
 
 # DB 선택이 세션에 반영된 뒤 유효 정책 로드
 POLICY = state.apply_effective_policy(st.session_state.db_name)
@@ -551,6 +534,25 @@ with head_r:
     )
 
 
+# ── Query target · 대상 DB 선택 ────────────────
+with st.container(border=True):
+    st.subheader("Query target · 질의 대상 DB")
+    sel_l, sel_r = st.columns([1, 2])
+    with sel_l:
+        dom = st.selectbox("도메인", ab.catalog.domains(), key="db_domain")
+    with sel_r:
+        choices = ab.catalog.names(dom)
+        if not choices:
+            st.error("`competition/` 아래에서 `all.parquet` 을 찾지 못했습니다.")
+            st.stop()
+        if st.session_state.db_name not in choices:
+            st.session_state.db_name = choices[0]
+        st.selectbox(
+            "Database", choices, key="db_name",
+            format_func=lambda n: f"{n} · {ab.catalog.meta(n)['title'][:40]}",
+        )
+
+
 # ── KPI 3개 (도넛 게이지 + metric 2개) ─────────
 _total_eps = max(float(POLICY["total_epsilon"]), 1e-9)
 _spent     = float(st.session_state.spent)
@@ -559,7 +561,10 @@ _ratio     = _spent / _total_eps
 _tone      = ("success" if _ratio < 0.6
               else ("warning" if _ratio < 0.9 else "danger"))
 
-g1, g2, g3 = st.columns(3)
+
+g1, g2 = st.columns(2)
+# g1, g2, g3 = st.columns(3)
+
 with g1:
     st.markdown(
         theme.donut_gauge(
@@ -573,20 +578,21 @@ with g2:
     _n_queries = sum(1 for m in st.session_state.messages if m["role"] == "user")
     st.metric("Queries (session)", _n_queries,
               help=f"질의당 ε · {st.session_state.eps:.2f}")
-with g3:
-    _source_label = {
-        "override":       "개인 오버라이드",
-        "db_default":     "DB 확정 정책",
-        "system_default": "시스템 기본값",
-    }[POLICY["source"]]
-    st.metric(
-        "유효 정책",
-        f"Risk {POLICY['risk_level']} · ε={_total_eps:.1f}",
-        help=f"출처 : {_source_label}",
-    )
+# with g3:
+#     _source_label = {
+#         "override":       "개인 오버라이드",
+#         "db_default":     "DB 확정 정책",
+#         "system_default": "시스템 기본값",
+#     }[POLICY["source"]]
+#     st.metric(
+#         "유효 정책",
+#         f"Risk {POLICY['risk_level']} · ε={_total_eps:.1f}",
+#         help=f"출처 : {_source_label}",
+#     )
 
 
 # ── 예산 추가 요청 버튼 (분석가만) ────────────
+st.markdown("\n")
 if not st.session_state.is_admin:
     b_l, b_r = st.columns([1, 4])
     with b_l:
@@ -616,7 +622,7 @@ with right:
     _render_editor_panel()
 
 
-st.divider()
+# st.divider()
 
 # ── 자연어 채팅 입력 ─────────────────────────
 if q := st.chat_input("코드를 모르시겠나요? 자연어로 질문하세요 "

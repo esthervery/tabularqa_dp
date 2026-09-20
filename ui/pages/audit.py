@@ -250,20 +250,21 @@ with st.session_state.nav_slot:
     user_q = st.text_input(
         "사용자 검색", placeholder="아이디 일부", key="req_filter_user",
     )
-
     st.divider()
-    st.caption("Snapshot")
-    _s = reqs.stats()
-    st.write(f"대기 · **{_s['pending']}**")
-    st.write(f"승인 · **{_s['approved']}**")
-    st.write(f"부분승인 · **{_s['partial']}**")
-    st.write(f"거절 · **{_s['rejected']}**")
+
+    # st.divider()
+    # st.caption("Snapshot")
+    # _s = reqs.stats()
+    # st.write(f"대기 · **{_s['pending']}**")
+    # st.write(f"승인 · **{_s['approved']}**")
+    # st.write(f"부분승인 · **{_s['partial']}**")
+    # st.write(f"거절 · **{_s['rejected']}**")
 
 
 # ── 헤더 ────────────────────────────────────
 head_l, head_r = st.columns([3, 1.2], vertical_alignment="center")
 with head_l:
-    st.title("Audit · 예산 결재")
+    st.title("예산 결재")
     st.caption("분석가의 리스크 업그레이드 신청을 검토·조정·결재합니다.")
 with head_r:
     st.write(f"🛡️ **Admin** · {st.session_state.username}")
@@ -280,7 +281,7 @@ c4.metric("총 신청",   sum(stat.values()))
 
 # ── 탭 ─────────────────────────────────────
 tab_queue, tab_hist, tab_access = st.tabs(
-    ["📥 대기 큐", "🕓 결재 타임라인", "🔍 액세스 로그"]
+    ["📥 대기", "🕓 결재 타임라인", "🔍 액세스 로그"]
 )
 
 

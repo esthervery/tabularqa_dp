@@ -481,15 +481,15 @@ ME = st.session_state.username
 
 # ── 헤더 ────────────────────────────────────────────
 st.title("Privacy Policy")
-st.caption(
-    "DB별로 리스크 레벨을 선택하면 총 ε 예산과 라운드 수(k)가 자동으로 결정됩니다. "
-    "리스크 버튼을 눌러 미리보기 그래프에서 신뢰구간 수렴과 인접 DB CI 겹침을 확인한 뒤 확정하세요."
-)
+# st.caption(
+#     "DB별로 리스크 레벨을 선택하면 총 ε 예산과 라운드 수(k)가 자동으로 결정됩니다. "
+#     "리스크 버튼을 눌러 미리보기 그래프에서 신뢰구간 수렴과 인접 DB CI 겹침을 확인한 뒤 확정하세요."
+# )
 
 
 # ── Policy scope · 편집 대상 DB ─────────────────────
 with st.container(border=True):
-    st.subheader("Policy scope · 편집 대상 DB")
+    st.subheader("데이터베이스 선택")
     sel_l, sel_r = st.columns([1, 2])
     with sel_l:
         dom = st.selectbox(
@@ -509,7 +509,7 @@ with st.container(border=True):
 
     if dp_sim.is_supported(st.session_state.db_name):
         st.caption(
-            f"🎯 시뮬레이션 대상 컬럼 : "
+            f"시뮬레이션 대상 컬럼 : "
             f"`{dp_sim.target_of(st.session_state.db_name)}`"
         )
     else:
@@ -524,16 +524,36 @@ DBNAME = st.session_state.db_name
 ACTIVE = db.get_active_policy(DBNAME)
 
 
+# ── Risk 버튼 5개 ──────────────────────────────
+with st.container(border=True):
+    st.subheader("리스크 레벨 선택")
+
+    btn_cols = st.columns(5)
+    for lvl in (1, 2, 3, 4, 5):
+        eps = db.RISK_TO_EPSILON[lvl]
+        is_current = (lvl == int(ACTIVE["risk_level"]))
+        label = f"Risk {lvl}\n(ε={eps:.0f})"
+        if btn_cols[lvl - 1].button(
+            label,
+            key=f"risk_btn_{lvl}",
+            type=("primary" if is_current else "secondary"),
+            width='stretch',
+        ):
+            st.session_state.policy_modal_open  = True
+            st.session_state.policy_modal_level = lvl
+            st.rerun()
+
+
 # ── Currently applied ────────────────────────────
 with st.container(border=True):
     is_default = ACTIVE.get("confirmed_at") is None
     if is_default:
-        st.subheader("Currently applied · 시스템 기본값 (Risk 1)")
+        st.subheader("활성 프라이버시 정책")
         st.caption(
             f"`{DBNAME}` 에 확정된 정책이 없어 시스템 기본값 (Risk 1) 이 적용됩니다."
         )
     else:
-        st.subheader(f"Currently applied · `{DBNAME}` 확정 정책")
+        st.subheader(f"현재 정책 · `{DBNAME}`")
         st.caption(
             f"확정 · {ACTIVE['confirmed_at'].replace('T', ' ')}"
             f" · by {ACTIVE.get('admin') or 'system'}"
@@ -545,28 +565,9 @@ with st.container(border=True):
     a3.metric("라운드 수 k", f"{int(ACTIVE['total_epsilon'] / dp_sim.EPS_PER_QUERY)}")
 
 
-# ── Risk 버튼 5개 ──────────────────────────────
-st.subheader("리스크 레벨 선택 · 미리보기")
-
-btn_cols = st.columns(5)
-for lvl in (1, 2, 3, 4, 5):
-    eps = db.RISK_TO_EPSILON[lvl]
-    is_current = (lvl == int(ACTIVE["risk_level"]))
-    label = f"Risk {lvl}\n(ε={eps:.0f})"
-    if btn_cols[lvl - 1].button(
-        label,
-        key=f"risk_btn_{lvl}",
-        type=("primary" if is_current else "secondary"),
-        width='stretch',
-    ):
-        st.session_state.policy_modal_open  = True
-        st.session_state.policy_modal_level = lvl
-        st.rerun()
-
-
 # ── 모달 (dialog) ──────────────────────────────
 
-@st.dialog("Risk 정책 미리보기", width="large")
+@st.dialog("Risk 정책 테스트", width="large")
 def _risk_preview_dialog():
     lvl = st.session_state.policy_modal_level
     if lvl is None:

@@ -50,6 +50,7 @@ if not authed:
 
 # ===로그인 후(authed = True)===
 # 개인 상한을 반영한 정책 정보 로딩
+# state.apply_active_policy()
 state.apply_effective_policy()
 
 IS_ADMIN = bool(st.session_state.get("is_admin"))
@@ -62,7 +63,7 @@ agent_qa = st.Page(
     "ui/pages/agent_qa.py",
     title="DP Agent Console",
     # icon=":material/chat:",
-    icon="💬",
+    icon="💻",
     default=True,
 )
 
@@ -73,7 +74,7 @@ if IS_ADMIN:
             st.Page("ui/pages/privacy.py",
                     title="Privacy Policy",
                     # icon=":material/shield:"),
-                    icon="🛡️"),
+                    icon="🎚️"),
             st.Page("ui/pages/audit.py",
                     title="Audit · 예산 결재",
                     # icon=":material/receipt_long:"),
@@ -101,7 +102,7 @@ with st.sidebar:
 
     # 사이드바 최하단 (역할 표시 + 로그아웃)
     with st.container(key="sidebar_bottom"):
-        st.divider()
+        # st.divider()
         role_label = "관리자" if IS_ADMIN else "분석가"
         st.write(f"**{role_label}** · {st.session_state.username}")
             # Ex) 관리자 · admin

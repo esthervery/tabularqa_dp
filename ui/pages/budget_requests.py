@@ -194,6 +194,7 @@ with st.session_state.nav_slot:
     _my = reqs.list_by_user(ME)
     _n_pending = sum(1 for r in _my if r["status"] == "pending")
     st.write(f"총 **{len(_my)}**건 · 대기 **{_n_pending}**건")
+    st.divider()
 
 
 # ── 프리셋 소비 (Agent 콘솔에서 넘어왔을 때) ───
@@ -218,7 +219,7 @@ with head_r:
 
 # ── 신청 폼 ─────────────────────────────────────
 with st.container(border=True):
-    st.subheader("New Request · 리스크 업그레이드 신청")
+    st.subheader("추가 예산 신청")
 
     c1, c2 = st.columns([1, 1])
     with c1:
