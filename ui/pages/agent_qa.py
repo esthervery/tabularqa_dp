@@ -66,6 +66,7 @@ def _render_schema_panel() -> None:
 
 
 def _stream_compact_code(stream) -> str:
+    """생성 코드를 작은 고정폭 글꼴로 스트리밍해 표시한다."""
     placeholder = st.empty()
     chunks: list[str] = []
     for chunk in stream:

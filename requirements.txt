@@ -1,7 +1,7 @@
 pandas
 numpy
 tqdm
-dotenv
+python-dotenv
 datasets
 databench_eval
 boto3
