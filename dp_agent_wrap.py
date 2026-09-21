@@ -331,8 +331,10 @@ def build_pipe_nosr(model="gpt-4o-mini", temperature=0.0, max_gen_len=300,
     load_dotenv()
     loader = utils.generic_load_sample if lite else utils.generic_load_table
 
-    _, exemplars = utils.annotation_reader(ANNOTATIONS_FILE)
-    shots = [exemplars[i] for i in (x[0] for x in EXEMPLAR_INDICES)]
+    # annotation_reader()는 HuggingFace의 전체 DataBench split을 내려받는다.
+    # 로컬 데모 데이터와는 예시 dataset 이름도 다르므로, 외부 다운로드 없이
+    # 현재 선택 DB의 스키마만 사용하는 zero-shot 모드로 동작시킨다.
+    shots = []
 
     # --- 메인 프롬프트: 예시 9개도 전부 SR 없이 렌더링된다 ---
     zs = SchemaOnlyZeroShot(loader, lite=lite)

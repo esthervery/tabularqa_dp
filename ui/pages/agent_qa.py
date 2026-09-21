@@ -415,14 +415,16 @@ def _run_agent_streaming(slot, q: str) -> None:
         )
 
     st.session_state.last_result = {
-        "value": out, "ok": ok, "src": "agent",
+        "value": (out if ok else trace.get("final_error")
+                  or "에이전트가 결과를 생성하지 못했습니다."),
+        "ok": ok, "src": "agent",
         "calls": trace.get("n_llm_calls", 0),
     }
     st.session_state.messages += [
         {"role": "user", "content": q},
         {"role": "assistant",
          "content": (f"결과: **{float(out):,.2f}**"
-                     if ok else "결과를 얻지 못했습니다."),
+                     if ok else str(st.session_state.last_result["value"])),
          "code": code},
     ]
     st.session_state.pending_q = None

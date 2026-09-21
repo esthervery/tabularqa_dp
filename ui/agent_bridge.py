@@ -64,14 +64,12 @@ def stream_code(question: str, db_name: str,
     row = {"question": question, "dataset": db_name}
 
     if pipe is None:
-        # 파이프라인 준비 실패 → mock 코드 반환 (UI 개발용 fallback)
-        code = ("    # The columns used to answer the question: ['Credit_Limit']\n"
-                "    # The types of the columns used to answer the question: ['int64']\n"
-                "    # The type of the answer: number\n"
-                "    return df['Credit_Limit'].mean()")
+        # 다른 DB의 컬럼을 가리키는 목업 코드는 실행하지 않는다.
+        code = "    # 에이전트 파이프라인을 준비하지 못했습니다.\n    return None"
         trace = {"output": None, "code": code, "n_llm_calls": 0,
-                 "n_fix_attempts": 0, "final_error": True,
-                 "mock": True, "pipe_error": err}
+                 "n_fix_attempts": 0,
+                 "final_error": "에이전트 파이프라인 준비에 실패했습니다.",
+                 "pipe_error": err}
     else:
         trace = pipe.run_one_traced(row)
         code = trace["code"]

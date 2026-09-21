@@ -156,6 +156,8 @@ Streamlit 은 매 rerun 마다 스크립트를 처음부터 다시 실행하므�
     can_spend(cost)           - 총 ε 예산 (=total_epsilon) 을 넘지 않는지
     spend(cost, kind, detail) - 상한 안이면 소비하고 로그 남김
 """
+from copy import deepcopy
+
 import streamlit as st
 
 
@@ -201,9 +203,10 @@ DEFAULTS = {
 
 
 def init() -> None:
-    """앱 진입 시 한 번 호출. 이미 있는 키는 건드리지 않는다."""
+    """앱 진입 시 한 번 호출. 가변 기본값은 세션마다 독립적으로 만든다."""
     for k, v in DEFAULTS.items():
-        st.session_state.setdefault(k, v)
+        if k not in st.session_state:
+            st.session_state[k] = deepcopy(v)
 
 
 def ensure_valid_db_name() -> None:
