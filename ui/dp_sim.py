@@ -51,9 +51,11 @@ SEED: int = 2027
 ALPHA: float = 0.05
 
 # DB → 시뮬레이션 대상 컬럼 매핑.
-# 새 DB 를 지원하려면 여기에 (db_name, column_name) 을 추가하면 된다.
+# 명시한 값은 우선 사용한다. 등록되지 않은 DB는 아래 자동 선택 로직이
+# 결측이 아닌 수치형 컬럼을 찾아 모든 카탈로그 데이터셋을 지원한다.
 SIM_TARGET: dict[str, str] = {
     "000_CardBase": "Credit_Limit",
+    "003_Love":     "What is your age? 👶🏻👵🏻",
     "047_Bank":     "credit_limit",
 }
 
@@ -96,13 +98,50 @@ class SimResult:
 # ── 등록 여부 확인 ────────────────────────────────
 
 def is_supported(db_name: str) -> bool:
-    """이 DB 에 대한 시뮬레이션 컬럼 매핑이 있는지."""
-    return db_name in SIM_TARGET
+    """시뮬레이션에 사용할 수치형 컬럼이 있는지."""
+    return target_of(db_name) is not None
 
 
 def target_of(db_name: str) -> Optional[str]:
-    """이 DB 의 시뮬레이션 대상 컬럼 이름. 미지원이면 None."""
-    return SIM_TARGET.get(db_name)
+    """명시 매핑 또는 자동 선택한 시뮬레이션 대상 수치형 컬럼."""
+    return SIM_TARGET.get(db_name) or _infer_numeric_target(db_name)
+
+
+@st.cache_data(show_spinner=False)
+def _infer_numeric_target(db_name: str) -> Optional[str]:
+    """식별자·이진값보다 연속적인 수치형 컬럼을 우선 선택한다."""
+    try:
+        df = catalog.load_df(db_name)
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+
+    candidates: list[tuple[tuple[int, int, int, int], str]] = []
+    for col in df.columns:
+        if not pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col]):
+            continue
+        values = pd.to_numeric(df[col], errors="coerce").to_numpy(dtype=float)
+        values = values[np.isfinite(values)]
+        unique = len(np.unique(values))
+        if len(values) < 2 or unique < 2:
+            continue
+
+        label = str(col).lower()
+        is_identifier = (
+            label in {"id", "wid"}
+            or label.endswith(" id")
+            or label.endswith("id")
+            or any(token in label for token in ("serial", "invoice", "customer"))
+        )
+        # 연속형 > 다값 범주형 > 이진값, 식별자 컬럼은 가장 나중에 선택.
+        score = (
+            int(not is_identifier),
+            int(unique > 2),
+            min(unique, 10_000),
+            len(values),
+        )
+        candidates.append((score, str(col)))
+
+    return max(candidates, default=(None, None))[1]
 
 
 # ── 코어 시뮬레이션 ──────────────────────────────
@@ -191,13 +230,18 @@ def simulate(db_name: str, risk_level: int) -> SimResult:
     if risk_level not in RISK_LEVELS:
         raise ValueError(f"risk_level 은 1..5 만 지원합니다: {risk_level}")
 
-    target_col = SIM_TARGET[db_name]
+    target_col = target_of(db_name)
+    if target_col is None:
+        raise ValueError(f"'{db_name}' 에 사용할 수치형 컬럼이 없습니다.")
     total_eps  = RISK_LEVELS[risk_level]
     k          = int(round(total_eps / EPS_PER_QUERY))
 
     # 데이터 로드 + 참 통계량
     df = catalog.load_df(db_name)
-    x  = df[target_col].to_numpy(dtype=float)
+    x = pd.to_numeric(df[target_col], errors="coerce").to_numpy(dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) < 2:
+        raise ValueError(f"'{db_name}/{target_col}' 에 유효한 수치값이 부족합니다.")
     n  = len(x)
     true_mean   = float(x.mean())
     sensitivity = float((x.max() - x.min()) / n)

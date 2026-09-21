@@ -29,6 +29,8 @@ st.set_page_config(
 
 # 세션 상태 초기화(디폴트 설정)
 state.init()
+# 구형 세션의 CardBase 같은 카탈로그 외 선택값을 실제 parquet DB로 보정한다.
+state.ensure_valid_db_name()
 
 
 # ===로그인 전(authed 디폴트는 False): 사이드바를 아예 숨김===
@@ -106,7 +108,7 @@ with st.sidebar:
         role_label = "관리자" if IS_ADMIN else "분석가"
         st.write(f"**{role_label}** · {st.session_state.username}")
             # Ex) 관리자 · admin
-        if st.button("Log out", width='stretch'):
+        if st.button("Log out", use_container_width=True):
             state.logout()
             st.rerun()
 

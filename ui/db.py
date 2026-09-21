@@ -554,8 +554,8 @@ CREATE TABLE IF NOT EXISTS budget_requests (
     created_at       TEXT NOT NULL,
     reviewed_at      TEXT
 );
-CREATE INDEX IF NOT EXISTS ix_req_user   ON budget_requests(username);
-CREATE INDEX IF NOT EXISTS ix_req_status ON budget_requests(status);
+CREATE INDEX IF NOT EXISTS ix_req_user_v2   ON budget_requests(username);
+CREATE INDEX IF NOT EXISTS ix_req_status_v2 ON budget_requests(status);
 
 -- DB 기본 정책 (관리자가 Privacy 페이지에서 확정)
 CREATE TABLE IF NOT EXISTS dp_policy (
@@ -567,7 +567,7 @@ CREATE TABLE IF NOT EXISTS dp_policy (
     confirmed_at  TEXT NOT NULL,
     note          TEXT
 );
-CREATE INDEX IF NOT EXISTS ix_policy_db ON dp_policy(db_name, confirmed_at);
+CREATE INDEX IF NOT EXISTS ix_policy_db_v2 ON dp_policy(db_name, confirmed_at);
 
 -- 사용자별 오버라이드 (예산 신청 승인으로만 생성)
 CREATE TABLE IF NOT EXISTS user_policy_override (
@@ -621,14 +621,51 @@ def _ensure_column(con, table: str, col: str, ddl: str) -> None:
         con.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
 
 
+def _archive_incompatible_table(con, table: str,
+                                required_columns: set[str]) -> None:
+    """새 정책 모델과 호환되지 않는 구형 테이블을 보존용 이름으로 바꾼다.
+
+    이전 버전의 dp_policy/budget_requests 는 컬럼 의미가 달라 ALTER TABLE만으로
+    안전하게 전환할 수 없다. 원본 행은 legacy 테이블에 남기고 새 테이블은
+    SCHEMA가 생성하게 한다.
+    """
+    exists = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+    ).fetchone()
+    if not exists:
+        return
+
+    columns = {
+        r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if required_columns.issubset(columns):
+        return
+
+    archive = f"{table}_legacy_v1"
+    suffix = 2
+    while con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (archive,)
+    ).fetchone():
+        archive = f"{table}_legacy_v{suffix}"
+        suffix += 1
+    con.execute(f"ALTER TABLE {table} RENAME TO {archive}")
+
+
 def init(seed_demo: bool = True) -> None:
     """스키마 준비 + (원한다면) 데모 계정 seed.
 
-    구버전에서 넘어올 때 새 컬럼만 add 되고 옛 컬럼은 그대로 방치된다.
-    dp_policy 는 스키마가 크게 바뀌었으므로, 실제 데모 전에는 dp_demo.db 를
-    지우고 새로 시작하는 것을 권장.
+    구형 정책/요청 테이블은 legacy 테이블로 보존하고 새 리스크 정책 스키마를
+    생성한다. 따라서 기존 dp_demo.db가 있어도 앱이 안전하게 기동된다.
     """
     with connect() as con:
+        _archive_incompatible_table(
+            con, "dp_policy",
+            {"db_name", "risk_level", "total_epsilon", "confirmed_at"},
+        )
+        _archive_incompatible_table(
+            con, "budget_requests",
+            {"username", "db_name", "current_level", "requested_level"},
+        )
         con.executescript(SCHEMA)
         _ensure_column(con, "users", "eps_cap",
                        "eps_cap REAL NOT NULL DEFAULT 10.0")

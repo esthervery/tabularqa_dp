@@ -206,6 +206,15 @@ def init() -> None:
         st.session_state.setdefault(k, v)
 
 
+def ensure_valid_db_name() -> None:
+    """카탈로그에 없는 이전 세션 DB 선택값을 안전하게 보정한다."""
+    from ui import catalog
+
+    names = catalog.names()
+    if names and st.session_state.get("db_name") not in names:
+        st.session_state.db_name = names[0]
+
+
 def logout() -> None:
     """세션 상태를 지우고 로그인 전 상태로 되돌린다."""
     for k in DEFAULTS:

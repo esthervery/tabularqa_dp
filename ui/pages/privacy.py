@@ -537,7 +537,7 @@ with st.container(border=True):
             label,
             key=f"risk_btn_{lvl}",
             type=("primary" if is_current else "secondary"),
-            width='stretch',
+            use_container_width=True,
         ):
             st.session_state.policy_modal_open  = True
             st.session_state.policy_modal_level = lvl
@@ -614,7 +614,7 @@ def _risk_preview_dialog():
             label_visibility="collapsed",
         )
     with c2:
-        if st.button("✓ 확정", type="primary", width='stretch'):
+        if st.button("✓ 확정", type="primary", use_container_width=True):
             new_active = db.confirm_policy(
                 admin=ME, db_name=DBNAME, risk_level=int(lvl),
                 note=note or None,
@@ -632,7 +632,7 @@ def _risk_preview_dialog():
             )
             st.rerun()
     with c3:
-        if st.button("✕ 취소", width='stretch'):
+        if st.button("✕ 취소", use_container_width=True):
             st.session_state.policy_modal_open = False
             st.session_state.policy_modal_level = None
             st.rerun()
@@ -660,7 +660,7 @@ with st.expander("Matrix · 모든 DB 의 현재 정책", expanded=False):
             "지원 여부":  "✓" if dp_sim.is_supported(_dn) else "—",
             "확정 시각":  _pol["confirmed_at"] if _pol else "—",
         })
-    st.dataframe(pd.DataFrame(_rows), width='stretch', hide_index=True)
+    st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
 
 
 # ── History ────────────────────────────────────
@@ -681,5 +681,5 @@ with st.expander("History · 확정 이력", expanded=False):
                 "total_epsilon": "총 ε",
                 "note":          "노트",
             }),
-            width='stretch', hide_index=True,
+            use_container_width=True, hide_index=True,
         )

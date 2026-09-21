@@ -323,10 +323,10 @@ def _render_pending_item(r: dict) -> None:
         with dec_r:
             st.caption(" ")   # 상단 여백 맞춤
             if st.button("✓ 승인", type="primary",
-                         key=f"ok_{r['id']}", width='stretch'):
+                         key=f"ok_{r['id']}", use_container_width=True):
                 st.session_state[f"_decide_{r['id']}"] = "approved"
             if st.button("✕ 거절",
-                         key=f"no_{r['id']}", width='stretch'):
+                         key=f"no_{r['id']}", use_container_width=True):
                 st.session_state[f"_decide_{r['id']}"] = "rejected"
 
         _apply_decision(r, approved_level, note)
@@ -412,7 +412,7 @@ with tab_access:
     if st.session_state.audit:
         st.dataframe(
             pd.DataFrame(st.session_state.audit),
-            width='stretch', hide_index=True,
+            use_container_width=True, hide_index=True,
         )
     else:
         st.info("아직 액세스 기록이 없습니다.")

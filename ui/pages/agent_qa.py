@@ -363,7 +363,7 @@ def _render_schema_panel() -> None:
                            label_visibility="collapsed")
         view = sch[sch["column"].str.contains(kw, case=False)] if kw else sch
         st.dataframe(
-            view, hide_index=True, width='stretch',
+            view, hide_index=True, use_container_width=True,
             height=min(38 * (len(view) + 1) + 3, 400),
             column_config={
                 "column": st.column_config.TextColumn("컬럼", width=140),
@@ -468,7 +468,7 @@ def _render_manual_tab() -> None:
         help="`return` 으로 스칼라 값을 반환하는 함수 본문을 작성하세요.",
     )
     b1, b2 = st.columns([1, 2], vertical_alignment="center")
-    if b1.button("▶ 실행", type="primary", width='stretch',
+    if b1.button("▶ 실행", type="primary", use_container_width=True,
                  key="run_manual"):
         _run_manual_code()
     b2.caption(f"실행 시 ε = {st.session_state.eps:.2f} 소모")
@@ -597,7 +597,7 @@ if not st.session_state.is_admin:
     b_l, b_r = st.columns([1, 4])
     with b_l:
         if st.button("💰 예산 추가 요청", type="secondary",
-                     width='stretch'):
+                     use_container_width=True):
             # 현재 DB 컨텍스트를 프리셋으로 넘겨 Budget Requests 페이지로 이동
             st.session_state.req_prefill_db    = st.session_state.db_name
             st.session_state.req_prefill_level = min(
