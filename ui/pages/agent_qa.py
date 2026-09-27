@@ -5,7 +5,7 @@ Renders (위→아래):
   [메인]
     1) Query target : [누적 소모 도넛] + 도메인 + Database  (3열 1행)
     2) [예산 추가 요청] 버튼 (분석가만) → Budget Requests 페이지로 이동하며 db_name 프리셋
-    3) 좌우 2컬럼 · 좌:Schema / 우: 탭(에이전트·수동) + 결과 metric + 자연어 입력창
+    3) 좌우 2컬럼 · 좌:Schema / 우: 탭(에이전트·수동) + 결과 블록 + 자연어 입력창
     4) 구분선
     5) History : 선택된 데이터셋의 질의·응답 기록 (최근 1건 항상 노출, 이하는 expander)
 
@@ -15,6 +15,8 @@ Renders (위→아래):
       도넛 게이지는 Query target 컨테이너의 1열로 이동.
     · 자연어 입력창(st.chat_input)을 편집 컨테이너 안으로 이동 (화면 하단 고정 해제).
     · 데이터셋을 바꾸면 이전 데이터셋의 코드·결과를 on_change 콜백에서 비운다.
+    · 에이전트 질의 실패(준비 실패 + 실행 중 오류)는 트레이스백 대신 안내 문구와
+      '파이프라인 다시 준비' 버튼으로 수렴시킨다.
 
 핵심 상태 키
     pending_q     : chat_input 이 넣은 질문. 다음 rerun 에서 Agent 탭이 처리.
@@ -22,9 +24,11 @@ Renders (위→아래):
     last_result   : {value, ok, src, calls} (데이터셋 전환 시 None 으로 리셋)
 """
 import html
+import numbers
+import traceback
 
 import streamlit as st
-from ui import agent_bridge as ab, db, state, theme
+from ui import agent_bridge as ab, boot, db, state, theme
 
 
 theme.inject_global_css()
@@ -74,18 +78,57 @@ def _stream_compact_code(stream) -> str:
 
 def _run_agent_streaming(slot, q: str) -> None:
     with slot.container():
-        with st.status("에이전트가 코드를 작성 중…", expanded=True) as stt:
-            st.caption("① 스키마로 프롬프트 구성 (원본 레코드 미포함)")
-            code = _stream_compact_code(
-                ab.stream_code(q, st.session_state.db_name)
+        stt = None
+        try:
+            with st.status("에이전트가 코드를 작성 중…", expanded=True) as stt:
+                st.caption("① 스키마로 프롬프트 구성 (원본 레코드 미포함)")
+                code = _stream_compact_code(
+                    ab.stream_code(q, st.session_state.db_name)
+                )
+                trace = st.session_state.get("_last_trace", {})
+                st.caption("② 샌드박스에서 실행")
+                stt.update(
+                    label="완료" if not trace.get("final_error") else "실행 실패",
+                    state="complete" if not trace.get("final_error") else "error",
+                    expanded=False,
+                )
+        except Exception as e:
+            # [0928] 준비 실패(PipelineUnavailable)와 실행 중 오류(OpenAI 인증/레이트리밋/
+            # 네트워크 등)를 동일하게 처리한다. 어느 쪽이든 데모에서 빨간 트레이스백이
+            # 그대로 노출되면 안 되므로, 안내 문구 + 재준비 버튼으로 수렴시킨다.
+            #
+            # mock 코드로 대체하지 않는 이유: 실행되지도 않는 가짜 코드가 '결과'처럼
+            # 보이면 데모 신뢰도가 깨진다.
+            # pending_q 를 지우지 않으므로, 재준비가 끝나고 리런되면 같은 질문이
+            # 이어서 실행된다(질문을 다시 입력할 필요 없음).
+            #
+            # 사유는 화면에 한 줄로 남기고, 전체 스택은 서버 콘솔로만 보낸다
+            # (화면에는 노출하지 않되 개발 중 원인 파악은 가능하게).
+            reason = (str(e) if isinstance(e, ab.PipelineUnavailable)
+                      else f"{type(e).__name__}: {e}")
+            traceback.print_exc()
+
+            # 예외로 빠져나오면 st.status 가 '작성 중…' 상태로 계속 돌아 보인다.
+            # 오류 문구와 함께 스피너가 남지 않도록 상태를 마감한다.
+            if stt is not None:
+                try:
+                    stt.update(label="파이프라인 오류", state="error",
+                               expanded=False)
+                except Exception:
+                    pass
+
+            st.error(
+                "에이전트 파이프라인 준비에 실패했습니다. "
+                "아래 버튼으로 다시 준비하거나 잠시 후 다시 시도하세요.",
+                icon="⚠️",
             )
-            trace = st.session_state.get("_last_trace", {})
-            st.caption("② 샌드박스에서 실행")
-            stt.update(
-                label="완료" if not trace.get("final_error") else "실행 실패",
-                state="complete" if not trace.get("final_error") else "error",
-                expanded=False,
-            )
+            st.caption(f"사유: {reason}")
+            if st.button("파이프라인 다시 준비", key="retry_pipeline",
+                         width='stretch'):
+                boot.discard()
+                boot.start()
+                st.rerun()
+            return
 
     st.session_state.manual_code = code
     out = trace.get("output")
@@ -172,23 +215,62 @@ def _render_manual_tab() -> None:
     b2.caption(f"실행 시 ε = {st.session_state.eps:.2f} 소모")
 
 
-def _render_result_metrics() -> None:
+def _render_result_block() -> None:
+    """실행 결과 전용 블록 (1단계).
+
+    ### 0928 수정
+    기존에는 `st.columns(3)` 균등 3열에 metric 3개를 넣었다. 그러면
+      · 답인 '실행 결과'가 1/3 폭만 받고,
+      · st.metric 이 긴 값을 말줄임으로 잘라내고(게다가 앞에서 24자 슬라이스까지),
+      · 코드 블록 바로 아래에 놓여 코드가 길면 화면 밖으로 밀렸다.
+    그래서 결과만 전용 블록으로 분리하고 폭을 2.6 : 1 : 1 로 넓게 배분한다.
+    남은 두 항목(소모 ε · LLM 호출)은 짧은 수치라 metric 을 그대로 쓴다.
+
+    스타일은 정의하지 않는다. 전역 CSS 를 나중에 한꺼번에 입힐 예정이므로
+    개발 단계에서는 네이티브 컴포넌트(border 컨테이너 · caption · write)만 쓴다.
+    """
     res = st.session_state.last_result
     if not res:
         return
-    if not res["ok"]:
-        st.error(str(res["value"]), icon="⚠️")
-        return
-    try:
-        val_str = f"{float(res['value']):,.2f}"
-    except (TypeError, ValueError):
-        val_str = str(res["value"])[:24]
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("실행 결과", val_str,
-              help="아직 노이즈가 적용되지 않은 참값입니다.")
-    c2.metric("소모 ε", f"{st.session_state.eps:.2f}")
-    c3.metric("LLM 호출", res["calls"])
+    if not res["ok"]:
+        # 결과가 None 이면 예전에는 'None' 문자열이 그대로 보였다.
+        # 사유가 있으면 그대로, 없으면 일반 문구로 대체한다.
+        detail = res["value"]
+        st.error(
+            "결과를 얻지 못했습니다." if detail is None else str(detail),
+            icon="⚠️",
+        )
+        return
+
+    # 값 표시 형식. 자르지 않는다 — 기존 [:24] 슬라이스가 리스트·문자열의
+    # 뒷부분을 조용히 지웠다(화면에서 `['Premium'...` 로 보이던 원인).
+    # 숫자 판별에 numbers 를 쓰는 이유: 실행기가 numpy 스칼라를 돌려줄 수 있는데
+    # np.int64 는 int 의 서브클래스가 아니라 내장 isinstance 로는 놓친다.
+    # bool 은 Integral 의 서브클래스이므로 먼저 걸러낸다.
+    v = res["value"]
+    if v is None:
+        val_str = "—"
+    elif isinstance(v, bool):
+        val_str = str(v)
+    elif isinstance(v, numbers.Integral):
+        val_str = f"{int(v):,}"
+    elif isinstance(v, numbers.Real):
+        val_str = f"{float(v):,.2f}"
+    else:
+        val_str = str(v)
+
+    c_res, c_eps, c_calls = st.columns([2.6, 1, 1],
+                                       vertical_alignment="top")
+    with c_res:
+        with st.container(border=True):
+            st.caption("실행 결과")
+            st.write(val_str)
+            st.caption("아직 노이즈가 적용되지 않은 참값입니다.")
+    with c_eps:
+        st.metric("소모 ε", f"{st.session_state.eps:.2f}")
+    with c_calls:
+        st.metric("LLM 호출", res["calls"])
 
 
 # [0928 수정] 편집 컨테이너
@@ -202,7 +284,7 @@ def _render_editor_panel() -> None:
             _render_agent_tab()
         with tab_manual:
             _render_manual_tab()
-        _render_result_metrics()
+        _render_result_block()
 
         # 입력창을 컨테이너 안에 두면 화면 하단 고정(pinned)이 풀리고 이 자리에 정적으로 앉는다.
         if q := st.chat_input("코드를 모르시겠나요? 자연어로 질문하세요 "

@@ -11,7 +11,7 @@ Renders (위→아래):
       · 메인          : st.navigation 이 선택한 페이지의 body
 """
 import streamlit as st
-from ui import auth, db, state
+from ui import auth, boot, db, state
 
 
 # 스키마 준비 + 세션 상태 확인. set_page_config 는 첫 Streamlit 호출이므로
@@ -29,6 +29,12 @@ st.set_page_config(
 
 # 세션 상태 초기화(디폴트 설정)
 state.init()
+
+# [0928] 파이프라인 워밍업: 로그인 화면을 띄우는 동안 백그라운드로 로딩한다.
+# 로그인 전 st.stop() 보다 먼저 호출해야 로그인 화면 시점부터 로딩이 시작된다.
+# (페이지 파일은 pg.run() 시점에 실행되므로, 여기서 안 걸면 첫 질의에서야 로딩이 시작된다.)
+# boot 모듈 안의 _started 가드 덕분에 리런마다 호출해도 기동은 1회뿐이다.
+boot.start()
 
 
 # ===로그인 전(authed 디폴트는 False): 사이드바를 아예 숨김===
@@ -108,6 +114,11 @@ with st.sidebar:
             # Ex) 관리자 · admin
         if st.button("Log out", width='stretch'):
             state.logout()
+            # [0928] 로그인마다 새 파이프라인이 되도록 폐기한다.
+            # st.rerun() 보다 먼저 호출해야 한다 — 뒤에 두면 이미 리런이 시작돼 반영되지 않는다.
+            # 폐기 후 다음 리런의 boot.start() 가 _started=False 를 보고 재기동하므로
+            # 별도로 재기동을 호출할 필요가 없다(로그아웃 즉시 다시 로딩이 시작된다).
+            boot.discard()
             st.rerun()
 
 
