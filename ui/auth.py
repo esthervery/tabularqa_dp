@@ -69,7 +69,8 @@ def _render_login_form() -> None:
         st.session_state.username      = user["username"]
         st.session_state.is_admin      = bool(user["is_admin"])
         st.session_state.eps_cap       = float(user["eps_cap"])
-        st.session_state.spent         = 0.0
+        # 누적 소모 ε 과 질의 기록은 SQLite(query_log)에 (계정 × 데이터셋) 단위로
+        # 남으므로 세션에서 초기화하지 않는다.
         state.log("auth", f"{user['username']} 로그인")
         st.rerun()
 
