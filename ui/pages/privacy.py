@@ -22,7 +22,7 @@ import pandas as pd
 import streamlit as st
 
 from ui import agent_bridge as ab, db, state, theme
-from ui import dp_sim
+from ui import dp_sim, dp_viz
 
 
 theme.inject_global_css()
@@ -142,10 +142,24 @@ def _risk_preview_dialog():
         f"현재 확정 : Risk {ACTIVE['risk_level']} (ε = {ACTIVE['total_epsilon']:.0f})"
     )
 
-    # ── 시각화 스텁 A ────────────────────────
-    with st.container(border=True):
-        st.info("📈 [시각화 A 자리]  라운드별 신뢰구간 수렴 그래프")
-        st.caption("(dp_sim 시각화 구현 이후 이 자리에 그래프가 렌더링됩니다)")
+    # ── 시각화 A : 라운드별 신뢰구간 수렴 (0928 구현) ──
+    # 에이전트를 호출하지 않고, 참평균 + 설정값으로 라플라스 노이즈를 주입한
+    # 합성 응답을 재생한다. 상대폭-임계값 비교는 하지 않는다(총 ε 은 Risk 로 확정).
+    if dp_sim.is_supported(DBNAME):
+        try:
+            _sim = dp_sim.simulate(DBNAME, lvl)
+            # render_convergence 도 try 안에 둔다 — 시각화 단계의 실패(축범위 등)가
+            # 트레이스백으로 새지 않고 안내 문구로 끝나게 하기 위함.
+            dp_viz.render_convergence(
+                _sim, state_key=f"dpviz_played_{DBNAME}_{lvl}"
+            )
+        except Exception as _e:
+            st.error(f"시뮬레이션을 실행하지 못했습니다: {_e}")
+    else:
+        st.info(
+            f"`{DBNAME}` 는 아직 시뮬레이션 대상 컬럼이 등록되어 있지 않습니다. "
+            f"`ui/dp_sim.py` 의 `SIM_TARGET` 에 추가하세요."
+        )
 
     # ── 시각화 스텁 B ────────────────────────
     with st.container(border=True):
