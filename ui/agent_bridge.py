@@ -5,7 +5,7 @@
 - stream_code(...)       : 질문을 받아 생성된 코드를 청크로 흘려보내는 제너레이터.
                            (실제 OpenAI streaming 이 준비되면 이 함수만 교체.)
                            준비 실패 시 mock 대신 PipelineUnavailable 을 올린다.
-- run_code(code, db)     : 수동 입력 코드도 동일한 샌드박스로 실행.
+- run_code(code, db)     : 수동 입력 코드를 별도 프로세스에서 실행.
 """
 import time
 import pandas as pd
@@ -104,15 +104,11 @@ def stream_code(question: str, db_name: str,
     st.session_state._last_trace = trace
 
 
-def run_code(code: str, db_name: str):
-    """수동 입력 코드도 에이전트와 동일한 샌드박스로 실행.
-
-    성공 시 결과값, 실패 시 __CODE_ERROR__/__TIMEOUT__ 접두어 문자열.
-    """
+def run_code(code: str, db_name: str) -> dict:
+    """Execute manual code without importing the LLM pipeline."""
+    from ui.manual_executor import execute
     try:
-        import dp_agent_wrap as W
-        import core.utils as utils
-        ex = W.InlineStatementExecutor(utils.generic_load_table, timeout=30)
-        return ex((code, db_name))
-    except Exception as e:
-        return f"__CODE_ERROR__: {e}"
+        table = catalog.table_path(db_name)
+    except Exception:
+        return {"ok": False, "message": "선택한 데이터셋을 불러오지 못했습니다."}
+    return execute(code, str(table))

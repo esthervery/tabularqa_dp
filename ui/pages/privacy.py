@@ -73,8 +73,7 @@ with st.container(border=True):
         )
     else:
         st.warning(
-            f"`{st.session_state.db_name}` 는 아직 시뮬레이션 대상 컬럼이 "
-            f"등록되어 있지 않습니다. `ui/dp_sim.py` 의 `SIM_TARGET` 에 추가하세요.",
+            f"`{st.session_state.db_name}`에는 시뮬레이션에 사용할 수치형 컬럼이 없습니다.",
             icon="⚠️",
         )
 
@@ -157,8 +156,7 @@ def _risk_preview_dialog():
             st.error(f"시뮬레이션을 실행하지 못했습니다: {_e}")
     else:
         st.info(
-            f"`{DBNAME}` 는 아직 시뮬레이션 대상 컬럼이 등록되어 있지 않습니다. "
-            f"`ui/dp_sim.py` 의 `SIM_TARGET` 에 추가하세요."
+            f"`{DBNAME}`에는 시뮬레이션에 사용할 수치형 컬럼이 없습니다."
         )
 
     # ── 시각화 스텁 B ────────────────────────

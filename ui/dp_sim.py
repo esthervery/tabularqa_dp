@@ -97,13 +97,52 @@ class SimResult:
 # ── 등록 여부 확인 ────────────────────────────────
 
 def is_supported(db_name: str) -> bool:
-    """이 DB 에 대한 시뮬레이션 컬럼 매핑이 있는지."""
-    return db_name in SIM_TARGET
+    """시뮬레이션에 사용할 수치형 컬럼이 있는지."""
+    return target_of(db_name) is not None
 
 
 def target_of(db_name: str) -> Optional[str]:
-    """이 DB 의 시뮬레이션 대상 컬럼 이름. 미지원이면 None."""
-    return SIM_TARGET.get(db_name)
+    """명시 매핑 또는 자동 선택한 시뮬레이션 대상 수치형 컬럼."""
+    return _infer_numeric_target(db_name)
+
+
+@st.cache_data(show_spinner=False)
+def _infer_numeric_target(db_name: str) -> Optional[str]:
+    """식별자·이진값보다 연속적인 수치형 컬럼을 우선 선택한다."""
+    try:
+        df = catalog.load_df(db_name)
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+
+    candidates: list[tuple[tuple[int, int, int, int], str]] = []
+    for col in df.columns:
+        if not pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col]):
+            continue
+        values = pd.to_numeric(df[col], errors="coerce").to_numpy(dtype=float, na_value=np.nan)
+        values = values[np.isfinite(values)]
+        unique = len(np.unique(values))
+        if len(values) < 2 or unique < 2:
+            continue
+
+        label = str(col).lower()
+        is_identifier = (
+            label in {"id", "wid"}
+            or label.endswith(" id")
+            or label.endswith("id")
+            or any(token in label for token in ("serial", "invoice", "customer"))
+        )
+        # 연속형 > 다값 범주형 > 이진값, 식별자 컬럼은 가장 나중에 선택.
+        score = (
+            int(not is_identifier),
+            int(unique > 2),
+            min(unique, 10_000),
+            len(values),
+        )
+        if SIM_TARGET.get(db_name) == col:
+            return str(col)
+        candidates.append((score, str(col)))
+
+    return max(candidates, default=(None, None))[1]
 
 
 # ── 코어 시뮬레이션 ──────────────────────────────
@@ -222,13 +261,12 @@ def simulate(db_name: str, risk_level: int) -> SimResult:
     """
     if not is_supported(db_name):
         raise ValueError(
-            f"'{db_name}' 는 시뮬레이션 대상 컬럼이 등록되어 있지 않습니다. "
-            f"ui/dp_sim.py 의 SIM_TARGET 에 추가하세요."
+            f"'{db_name}'에는 시뮬레이션에 사용할 수치형 컬럼이 없습니다."
         )
     if risk_level not in RISK_LEVELS:
         raise ValueError(f"risk_level 은 1..5 만 지원합니다: {risk_level}")
 
-    declared_col = SIM_TARGET[db_name]
+    declared_col = target_of(db_name)
     total_eps    = RISK_LEVELS[risk_level]
     k            = int(round(total_eps / EPS_PER_QUERY))
 
@@ -236,7 +274,7 @@ def simulate(db_name: str, risk_level: int) -> SimResult:
     df = catalog.load_df(db_name)
     # 컬럼명 표기 차이(대소문자/밑줄)를 흡수해 실제 컬럼명을 확정한다.
     target_col = _resolve_target_col(df, declared_col, db_name)
-    x  = df[target_col].to_numpy(dtype=float)
+    x  = df[target_col].to_numpy(dtype=float, na_value=np.nan)
     # [0928 수정] 결측/무한을 먼저 제거한다.
     #   거르지 않으면 값 하나의 NaN 이 true_mean → Δ → 모든 응답 → CI → 축범위로
     #   전파되어, 시각화 A 가 matplotlib ValueError("Axis limits cannot be NaN or Inf")

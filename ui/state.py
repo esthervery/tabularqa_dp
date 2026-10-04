@@ -24,6 +24,7 @@ Streamlit 은 매 rerun 마다 스크립트를 처음부터 다시 실행하므�
     spend(cost, kind, detail)  - 상한 안이면 소비하고 로그 남김 (True/False)
     record_query(...)          - 질의·응답을 데이터셋별 history 에 기록
 """
+from copy import deepcopy
 import streamlit as st
 
 
@@ -69,7 +70,7 @@ DEFAULTS = {
 def init() -> None:
     """앱 진입 시 한 번 호출. 이미 있는 키는 건드리지 않는다."""
     for k, v in DEFAULTS.items():
-        st.session_state.setdefault(k, v)
+        st.session_state.setdefault(k, deepcopy(v))
 
 
 def logout() -> None:
@@ -77,8 +78,8 @@ def logout() -> None:
 
     소모 ε 과 질의 기록은 SQLite(query_log)에 있으므로 세션을 지워도 보존된다.
     """
-    for k in DEFAULTS:
-        st.session_state.pop(k, None)
+    for k in list(st.session_state):
+        del st.session_state[k]
     init()
 
 
@@ -188,3 +189,22 @@ def record_query(question: str, answer: str,
     eps = float(st.session_state.eps) if ok else 0.0
     return _db.log_query(user, dn, question, answer,
                          code=code, ok=ok, eps_spent=eps)
+
+def select_database() -> bool:
+    """Validate the selection before headers and policy are rendered."""
+    from ui import catalog
+    if st.session_state.get("db_domain") not in catalog.domains():
+        st.session_state.db_domain = "전체"
+    choices = catalog.names(st.session_state.db_domain)
+    if not choices:
+        return False
+    if st.session_state.db_name not in choices:
+        st.session_state.db_name = choices[0]
+    if st.session_state.get("_active_database") != st.session_state.db_name:
+        reset_console()
+        st.session_state.pending_q = None
+        st.session_state.policy_modal_open = False
+        st.session_state.policy_modal_level = None
+        st.session_state.pop("policy_confirm_note", None)
+        st.session_state._active_database = st.session_state.db_name
+    return True

@@ -25,6 +25,7 @@ Renders (위→아래):
 """
 import html
 import numbers
+import pandas as pd
 import traceback
 
 import streamlit as st
@@ -39,8 +40,7 @@ theme.inject_global_css()
 # ─────────────────────────────────────────────────
 
 def _render_schema_panel() -> None:
-    with st.container(border=True, height=540):
-        st.subheader("Schema")
+    with st.expander("Schema · 컬럼 목록", expanded=False):
         try:
             sch = ab.schema_of(st.session_state.db_name)
         except Exception as e:
@@ -137,7 +137,7 @@ def _run_agent_streaming(slot, q: str) -> None:
     # 성공했더라도 "이 데이터셋"의 ε 예산 넘으면 결과 감춤
     # (예산은 데이터셋별로 관리된다 — state.spend 는 현재 선택된 DB 기준)
     if ok and not state.spend(st.session_state.eps, "query", q):
-        ok, out = False, None
+        ok, out = False, "ε 예산을 초과하여 결과를 반환하지 않았습니다."
         st.error(
             "ε 예산을 초과하여 결과를 반환하지 않았습니다. "
             "예산 추가 요청을 고려하세요.",
@@ -165,26 +165,30 @@ def _run_agent_streaming(slot, q: str) -> None:
 
 def _run_manual_code() -> None:
     if not state.can_spend(st.session_state.eps):
-        st.error(
-            "ε 예산을 초과했습니다. 예산 추가 요청을 고려하세요.",
-            icon="🚫",
-        )
+        st.session_state.last_result = {
+            "value": "사용 가능한 예산이 부족합니다. 예산을 추가한 뒤 다시 실행해주세요.",
+            "ok": False, "src": "manual", "calls": 0,
+        }
         return
-    r = ab.run_code(st.session_state.manual_code, st.session_state.db_name)
-    ok = not str(r).startswith(("__CODE_ERROR__", "__TIMEOUT__"))
-    if ok:
-        state.spend(st.session_state.eps, "manual", "직접 코드 실행")
-    # 수동 실행도 같은 데이터셋 history 에 남긴다 (질문란이 없으므로 수동 실행으로 표기).
-    state.record_query(
-        "(수동 코드 실행)",
-        str(r) if ok else f"실행 실패 — {r}",
-        code=st.session_state.manual_code,
-        ok=ok,
-    )
+    code = st.session_state.manual_code
+    with st.spinner("선택한 데이터셋에서 실행 중…"):
+        result = ab.run_code(code, st.session_state.db_name)
+    ok = result["ok"]
+    value = result.get("value") if ok else result["message"]
+    if ok and not state.spend(st.session_state.eps, "manual", "직접 코드 실행"):
+        ok, value = False, "사용 가능한 예산이 부족합니다."
+    answer = "실행 완료 (반환값 없음)" if ok and value is None else str(value)
+    state.record_query("(수동 코드 실행)", answer, code=code, ok=ok)
     st.session_state.last_result = {
-        "value": r, "ok": ok, "src": "manual", "calls": 0,
+        "value": value, "ok": ok, "src": "manual", "calls": 0,
     }
     st.rerun()
+
+
+def _load_history_code(code: str, run: bool = False) -> None:
+    st.session_state.manual_code = code
+    st.session_state.pending_manual_run = run
+    st.session_state.last_result = None
 
 
 def _render_agent_tab() -> None:
@@ -203,16 +207,18 @@ def _render_agent_tab() -> None:
 
 
 def _render_manual_tab() -> None:
+    if st.session_state.pop("pending_manual_run", False):
+        _run_manual_code()
     st.text_area(
         "코드 본문", key="manual_code", height=220,
         label_visibility="collapsed",
-        help="`return` 으로 스칼라 값을 반환하는 함수 본문을 작성하세요.",
+        help="선택한 데이터는 df입니다. 예: df.shape[0] 또는 return df.shape[0]. 마지막 식이나 print 결과도 표시됩니다.",
     )
     b1, b2 = st.columns([1, 2], vertical_alignment="center")
     if b1.button("▶ 실행", type="primary", width='stretch',
                  key="run_manual"):
         _run_manual_code()
-    b2.caption(f"실행 시 ε = {st.session_state.eps:.2f} 소모")
+    b2.caption(f"성공 시 ε = {st.session_state.eps:.2f} 소모 · 실패 시 차감 없음")
 
 
 def _render_result_block() -> None:
@@ -237,7 +243,8 @@ def _render_result_block() -> None:
         # 결과가 None 이면 예전에는 'None' 문자열이 그대로 보였다.
         # 사유가 있으면 그대로, 없으면 일반 문구로 대체한다.
         detail = res["value"]
-        st.error(
+        notice = st.info if res.get("src") == "manual" else st.error
+        notice(
             "결과를 얻지 못했습니다." if detail is None else str(detail),
             icon="⚠️",
         )
@@ -249,6 +256,10 @@ def _render_result_block() -> None:
     # np.int64 는 int 의 서브클래스가 아니라 내장 isinstance 로는 놓친다.
     # bool 은 Integral 의 서브클래스이므로 먼저 걸러낸다.
     v = res["value"]
+    if isinstance(v, (pd.DataFrame, pd.Series)):
+        st.dataframe(v, width="stretch")
+    elif isinstance(v, (list, dict, tuple)):
+        st.json(v)
     if v is None:
         val_str = "—"
     elif isinstance(v, bool):
@@ -273,40 +284,51 @@ def _render_result_block() -> None:
         st.metric("LLM 호출", res["calls"])
 
 
-# [0928 수정] 편집 컨테이너
-#   · height=540 고정을 제거했다. 채팅 입력창이 이 컨테이너 안으로 들어오면서
-#     내용이 540px 를 넘으면 내부 스크롤이 생겨 입력창이 스크롤 뒤로 숨을 수 있다.
-#   · 자연어 입력창은 탭 바깥(컨테이너 안)에 두어 에이전트/수동 두 모드에서 모두 보이게 했다.
 def _render_editor_panel() -> None:
-    with st.container(border=True):
-        tab_agent, tab_manual = st.tabs(["💬 에이전트 모드", "⌨️ 수동 입력 모드"])
-        with tab_agent:
+    schema_col, agent_col, manual_col = st.columns([1, 1.5, 1.5], gap="medium")
+    with schema_col:
+        _render_schema_panel()
+    with agent_col:
+        with st.container(border=True, key="agent_input_panel"):
+            st.subheader("💬 에이전트 모드")
             _render_agent_tab()
-        with tab_manual:
+            last = st.session_state.get("last_result")
+            if last and last.get("src") == "agent":
+                _render_result_block()
+            if q := st.chat_input("선택한 데이터에 대해 질문하세요 (예: 총 몇 건인가요?)"):
+                st.session_state.pending_q = q
+                st.rerun()
+    with manual_col:
+        with st.container(border=True, key="manual_input_panel"):
+            st.subheader("⌨️ 수동 입력 모드")
             _render_manual_tab()
-        _render_result_block()
-
-        # 입력창을 컨테이너 안에 두면 화면 하단 고정(pinned)이 풀리고 이 자리에 정적으로 앉는다.
-        if q := st.chat_input("코드를 모르시겠나요? 자연어로 질문하세요 "
-                              "(예: 신용한도 평균은 얼마인가요?)"):
-            st.session_state.pending_q = q
-            st.rerun()
+            last = st.session_state.get("last_result")
+            if last and last.get("src") == "manual":
+                _render_result_block()
 
 
 # [0928 수정] History 섹션
 #   데이터셋 selectbox 를 바꾸면 이 패널의 내용도 함께 바뀐다 (조회 스코프 = 계정 × 데이터셋).
 def _render_query_card(r: dict) -> None:
     """질의 1건 카드 (History 최신 1건과 expander 내부에서 공용)."""
-    mark = "✅" if r["ok"] else "⚠️"
+    mark = "✅" if r["ok"] else "○"
     with st.container(border=True):
         st.write(f"{mark} **Q.** {r['question'] or '—'}")
-        st.write(f"**A.** {r['answer'] or '—'}")
+        answer = r["answer"] or "—"
+        if not r["ok"] and any(token in answer for token in ("__CODE_ERROR__", "__TIMEOUT__", "Traceback")):
+            answer = "실행을 완료하지 못했습니다. 코드를 수정한 뒤 다시 실행해주세요."
+        st.write(f"**A.** {answer}")
         st.caption(
             f"{(r['asked_at'] or '').replace('T', ' ')} · "
             f"소모 ε {float(r['eps_spent']):.2f}"
         )
         if r["code"]:
             st.code(r["code"], language="python")
+            edit_col, run_col = st.columns(2)
+            edit_col.button("수동 입력으로 가져오기", key=f"history_edit_{r['id']}",
+                            on_click=_load_history_code, args=(r["code"], False))
+            run_col.button("다시 실행", key=f"history_run_{r['id']}",
+                           on_click=_load_history_code, args=(r["code"], True))
 
 
 def _render_history_panel() -> None:
@@ -351,18 +373,8 @@ def _render_history_panel() -> None:
 
 
 # ── 헤더 ────────────────────────────────────────
-head_l, head_r = st.columns([3, 1.2], vertical_alignment="center")
-with head_l:
-    st.title("DP Agent Console")
-    st.caption("질문 → 코드 생성 → 샌드박스 실행 → ε 원장 기록")
-with head_r:
-    _meta = ab.catalog.meta(st.session_state.db_name)
-    st.write(f"**DB** · `{st.session_state.db_name}`")
-    st.caption(
-        f"{_meta.get('title', st.session_state.db_name)} · "
-        f"{int(_meta.get('n_rows', 0)):,} rows · "
-        f"{int(_meta.get('n_cols', 0)):,} columns"
-    )
+st.title("DP Agent Console")
+st.caption("질문 → 코드 생성 → 샌드박스 실행 → ε 원장 기록")
 
 
 # ── Query target · 대상 DB 선택 (3열: 도넛 / 도메인 / Database) ────
@@ -394,6 +406,14 @@ with st.container(border=True):
             on_change=state.reset_console,
             format_func=lambda n: f"{n} · {ab.catalog.meta(n)['title'][:40]}",
         )
+
+    _meta = ab.catalog.meta(st.session_state.db_name)
+    st.markdown(f"**선택된 DB** · `{st.session_state.db_name}`")
+    st.caption(
+        f"{_meta.get('title', st.session_state.db_name)} · "
+        f"{int(_meta.get('n_rows', 0)):,} rows · "
+        f"{int(_meta.get('n_cols', 0)):,} columns"
+    )
 
 
 # ── 유효 정책 로드 + 도넛 게이지 ───────────────
@@ -443,12 +463,8 @@ if not st.session_state.is_admin:
 st.divider()
 
 
-# ── 라이브 코딩 영역 (좌: Schema / 우: 편집기 + 입력창) ──
-left, right = st.columns([1, 1.55], gap="medium")
-with left:
-    _render_schema_panel()
-with right:
-    _render_editor_panel()
+# Schema and both input panels share one row.
+_render_editor_panel()
 
 
 # ── History · 선택한 데이터셋의 질의 기록 ────
