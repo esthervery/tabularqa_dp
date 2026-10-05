@@ -172,7 +172,19 @@ def _run_manual_code() -> None:
         return
     code = st.session_state.manual_code
     with st.spinner("선택한 데이터셋에서 실행 중…"):
-        result = ab.run_code(code, st.session_state.db_name)
+        try:
+            result = ab.run_code(code, st.session_state.db_name)
+        except Exception:
+            # 실행기 내부 예외가 Streamlit 화면까지 전파되지 않도록 한다.
+            result = {
+                "ok": False,
+                "message": "코드를 실행하지 못했습니다. 내용을 수정한 뒤 다시 실행해주세요.",
+            }
+    if not isinstance(result, dict):
+        result = {
+            "ok": False,
+            "message": "실행 결과 형식을 읽지 못했습니다. 코드를 수정한 뒤 다시 실행해주세요.",
+        }
     ok = result["ok"]
     value = result.get("value") if ok else result["message"]
     if ok and not state.spend(st.session_state.eps, "manual", "직접 코드 실행"):
@@ -214,6 +226,7 @@ def _render_manual_tab() -> None:
         label_visibility="collapsed",
         help="선택한 데이터는 df입니다. 예: df.shape[0] 또는 return df.shape[0]. 마지막 식이나 print 결과도 표시됩니다.",
     )
+    st.caption("`df`는 현재 선택한 데이터셋입니다. 마지막 식 또는 `return` 값이 결과로 표시됩니다.")
     b1, b2 = st.columns([1, 2], vertical_alignment="center")
     if b1.button("▶ 실행", type="primary", width='stretch',
                  key="run_manual"):
