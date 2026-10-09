@@ -91,18 +91,58 @@ class SimResult:
     overlap_lo:   Optional[float] # 겹칠 때만 값
     overlap_hi:   Optional[float]
     overlap_ratio: float          # 0.0..1.0
+    n_dropped:    int = 0         # [0928] 결측/무한으로 제외된 행 수
 
 
 # ── 등록 여부 확인 ────────────────────────────────
 
 def is_supported(db_name: str) -> bool:
-    """이 DB 에 대한 시뮬레이션 컬럼 매핑이 있는지."""
-    return db_name in SIM_TARGET
+    """시뮬레이션에 사용할 수치형 컬럼이 있는지."""
+    return target_of(db_name) is not None
 
 
 def target_of(db_name: str) -> Optional[str]:
-    """이 DB 의 시뮬레이션 대상 컬럼 이름. 미지원이면 None."""
-    return SIM_TARGET.get(db_name)
+    """명시 매핑 또는 자동 선택한 시뮬레이션 대상 수치형 컬럼."""
+    return _infer_numeric_target(db_name)
+
+
+@st.cache_data(show_spinner=False)
+def _infer_numeric_target(db_name: str) -> Optional[str]:
+    """식별자·이진값보다 연속적인 수치형 컬럼을 우선 선택한다."""
+    try:
+        df = catalog.load_df(db_name)
+    except (FileNotFoundError, OSError, ValueError):
+        return None
+
+    candidates: list[tuple[tuple[int, int, int, int], str]] = []
+    for col in df.columns:
+        if not pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col]):
+            continue
+        values = pd.to_numeric(df[col], errors="coerce").to_numpy(dtype=float, na_value=np.nan)
+        values = values[np.isfinite(values)]
+        unique = len(np.unique(values))
+        if len(values) < 2 or unique < 2:
+            continue
+
+        label = str(col).lower()
+        is_identifier = (
+            label in {"id", "wid"}
+            or label.endswith(" id")
+            or label.endswith("id")
+            or any(token in label for token in ("serial", "invoice", "customer"))
+        )
+        # 연속형 > 다값 범주형 > 이진값, 식별자 컬럼은 가장 나중에 선택.
+        score = (
+            int(not is_identifier),
+            int(unique > 2),
+            min(unique, 10_000),
+            len(values),
+        )
+        if SIM_TARGET.get(db_name) == col:
+            return str(col)
+        candidates.append((score, str(col)))
+
+    return max(candidates, default=(None, None))[1]
 
 
 # ── 코어 시뮬레이션 ──────────────────────────────
@@ -176,6 +216,42 @@ def _overlap(a_lo: float, a_hi: float,
     return lo, hi, (hi - lo) / width_a
 
 
+def _normalize_col(name: str) -> str:
+    """컬럼명 비교용 정규화 — 대소문자·공백·밑줄을 무시한다."""
+    return str(name).strip().lower().replace(" ", "").replace("_", "")
+
+
+def _resolve_target_col(df: pd.DataFrame, target_col: str, db_name: str) -> str:
+    """SIM_TARGET 에 적힌 컬럼명을 실제 DataFrame 의 컬럼에 맞춘다.
+
+    데이터셋마다 표기가 달라질 수 있다(예: CardBase 는 'Credit_Limit',
+    Bank 는 'credit_limit'). pandas 의 df[...] 는 대소문자를 구분하므로
+    이름이 1글자만 달라도 KeyError 가 난다.
+
+    순서: ① 정확 일치 → ② 대소문자/밑줄 무시 일치 → ③ 실패 시 안내.
+    """
+    if target_col in df.columns:
+        return target_col
+
+    key = _normalize_col(target_col)
+    matches = [c for c in df.columns if _normalize_col(c) == key]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise ValueError(
+            f"'{db_name}' 에 '{target_col}' 와 (대소문자·밑줄만 다른) 같은 이름의 "
+            f"컬럼이 여러 개 있습니다: {matches}. "
+            f"ui/dp_sim.py 의 SIM_TARGET 에 정확한 이름을 지정하세요."
+        )
+
+    near = [c for c in df.columns if key in _normalize_col(c) or _normalize_col(c) in key]
+    hint = f" 비슷한 이름: {near}." if near else ""
+    raise ValueError(
+        f"'{db_name}' 에 컬럼 '{target_col}' 이(가) 없습니다.{hint} "
+        f"사용 가능한 컬럼({len(df.columns)}개): {list(df.columns)[:40]}"
+    )
+
+
 @st.cache_data(show_spinner="시뮬레이션 실행 중…")
 def simulate(db_name: str, risk_level: int) -> SimResult:
     """리스크 레벨 하나에 대한 완전한 시뮬레이션 결과를 반환.
@@ -185,20 +261,35 @@ def simulate(db_name: str, risk_level: int) -> SimResult:
     """
     if not is_supported(db_name):
         raise ValueError(
-            f"'{db_name}' 는 시뮬레이션 대상 컬럼이 등록되어 있지 않습니다. "
-            f"ui/dp_sim.py 의 SIM_TARGET 에 추가하세요."
+            f"'{db_name}'에는 시뮬레이션에 사용할 수치형 컬럼이 없습니다."
         )
     if risk_level not in RISK_LEVELS:
         raise ValueError(f"risk_level 은 1..5 만 지원합니다: {risk_level}")
 
-    target_col = SIM_TARGET[db_name]
-    total_eps  = RISK_LEVELS[risk_level]
-    k          = int(round(total_eps / EPS_PER_QUERY))
+    declared_col = target_of(db_name)
+    total_eps    = RISK_LEVELS[risk_level]
+    k            = int(round(total_eps / EPS_PER_QUERY))
 
     # 데이터 로드 + 참 통계량
     df = catalog.load_df(db_name)
-    x  = df[target_col].to_numpy(dtype=float)
-    n  = len(x)
+    # 컬럼명 표기 차이(대소문자/밑줄)를 흡수해 실제 컬럼명을 확정한다.
+    target_col = _resolve_target_col(df, declared_col, db_name)
+    x  = df[target_col].to_numpy(dtype=float, na_value=np.nan)
+    # [0928 수정] 결측/무한을 먼저 제거한다.
+    #   거르지 않으면 값 하나의 NaN 이 true_mean → Δ → 모든 응답 → CI → 축범위로
+    #   전파되어, 시각화 A 가 matplotlib ValueError("Axis limits cannot be NaN or Inf")
+    #   로 죽는다. (결측이 섞인 Bank 데이터에서 실제로 발생.)
+    n_raw     = int(x.size)
+    x         = x[np.isfinite(x)]
+    n_dropped = n_raw - int(x.size)
+
+    if x.size < 2:
+        raise ValueError(
+            f"'{db_name}'.'{target_col}' 에 유한한 값이 2개 미만입니다 "
+            f"(원본 {n_raw}행 · 유한 {x.size}행). 시뮬레이션할 수 없습니다."
+        )
+
+    n           = int(x.size)
     true_mean   = float(x.mean())
     sensitivity = float((x.max() - x.min()) / n)
 
@@ -224,6 +315,7 @@ def simulate(db_name: str, risk_level: int) -> SimResult:
         k=k,
         seed=SEED,
         n_rows=n,
+        n_dropped=n_dropped,
         sensitivity=sensitivity,
         true_mean=true_mean,
         ks=np.arange(1, k + 1),

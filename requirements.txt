@@ -10,3 +10,4 @@ pyyaml
 openai
 streamlit
 matplotlib
+scipy
