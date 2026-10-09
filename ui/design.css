@@ -22,6 +22,10 @@ button[kind="secondary"] { background:#fff; border:1px solid #e2e8f0; border-rad
 button[kind="secondary"]:hover { border-color:#6366f1; color:#4338ca; background:#eef2ff; }
 button:focus-visible, input:focus-visible { outline:2px solid #6366f1; outline-offset:3px; }
 [data-baseweb="input"], [data-baseweb="select"] > div, [data-baseweb="textarea"] { background:#fff; border-radius:8px; }
+/* 선택 상자는 흰 컨테이너 위에서 경계가 사라지므로 테두리를 명시한다. */
+[data-testid="stSelectbox"] [role="group"] { background:#fff !important; border:1px solid #cbd5e1 !important; border-radius:8px; }
+[data-testid="stSelectbox"] [role="group"]:hover { border-color:var(--primary-line) !important; }
+[data-testid="stSelectbox"] [role="group"]:focus-within { border-color:var(--primary) !important; }
 [data-testid="stChatInput"] { border:1px solid #c7d2fe; border-radius:12px; background:white; }
 [data-testid="stBottomBlockContainer"] { background:#f8fafc; }
 [data-testid="stDataFrame"], [data-testid="stCode"] { border-radius:10px; overflow:hidden; }
@@ -98,6 +102,15 @@ button:focus-visible, input:focus-visible { outline:2px solid #6366f1; outline-o
 }
 [data-testid="stMainBlockContainer"]:has(.st-key-workspace_header) { padding-top:4.25rem; }
 .st-key-workspace_navigation { margin-top:0; }
+/* Keep the page navigation pinned under the fixed header while scrolling.
+   Sticky goes on Streamlit's wrapper: the keyed container itself is
+   exactly as tall as its parent, so it has no room to stick. */
+[data-testid="stLayoutWrapper"]:has(> .st-key-workspace_navigation) {
+  position:sticky; top:3.75rem; z-index:999990;
+}
+.st-key-workspace_navigation {
+  box-shadow:0 0 0 .5rem var(--wash), 0 .5rem 1rem -.5rem rgba(15,23,42,.12);
+}
 @media(max-width:768px) {
   .st-key-workspace_header {
     left:1rem; width:calc(100% - 1rem - 150px) !important;

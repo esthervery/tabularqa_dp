@@ -55,8 +55,9 @@ def _render_schema_panel() -> None:
             view, hide_index=True, width='stretch',
             height=min(38 * (len(view) + 1) + 3, 400),
             column_config={
-                "column": st.column_config.TextColumn("컬럼", width=140),
-                "dtype":  st.column_config.TextColumn("타입", width=280),
+                # 컬럼명이 잘리지 않도록 이름 열에 폭을 몰아주고 타입 열은 좁게 둔다.
+                "column": st.column_config.TextColumn("컬럼", width="large"),
+                "dtype":  st.column_config.TextColumn("타입", width="small"),
             },
         )
 
@@ -198,6 +199,8 @@ def _run_manual_code() -> None:
 
 
 def _load_history_code(code: str, run: bool = False) -> None:
+    # 기록의 코드는 수동 입력 모드에서 열리므로 모드도 함께 전환한다.
+    st.session_state.input_mode = "manual"
     st.session_state.manual_code = code
     st.session_state.pending_manual_run = run
     st.session_state.last_result = None
@@ -297,27 +300,50 @@ def _render_result_block() -> None:
         st.metric("LLM 호출", res["calls"])
 
 
+def _set_input_mode(mode: str) -> None:
+    st.session_state.input_mode = mode
+
+
+def _render_mode_buttons() -> None:
+    """에이전트 / 수동 입력 중 하나를 고르는 버튼. 선택된 쪽을 primary 로 강조한다."""
+    mode = st.session_state.input_mode
+    agent_btn, manual_btn, _ = st.columns([1, 1, 3])
+    agent_btn.button("💬 에이전트 모드", key="mode_agent", width="stretch",
+                     type="primary" if mode == "agent" else "secondary",
+                     on_click=_set_input_mode, args=("agent",))
+    manual_btn.button("⌨️ 수동 입력 모드", key="mode_manual", width="stretch",
+                      type="primary" if mode == "manual" else "secondary",
+                      on_click=_set_input_mode, args=("manual",))
+
+
 def _render_editor_panel() -> None:
-    schema_col, agent_col, manual_col = st.columns([1, 1.5, 1.5], gap="medium")
+    """선택한 모드 하나만 스키마 옆에 띄운다. 선택 전에는 안내만 보인다."""
+    mode = st.session_state.input_mode
+    if mode not in ("agent", "manual"):
+        st.caption("위에서 에이전트 모드 또는 수동 입력 모드를 선택하세요.")
+        return
+
+    schema_col, input_col = st.columns([1, 1.4], gap="medium")
     with schema_col:
         _render_schema_panel()
-    with agent_col:
-        with st.container(border=True, key="agent_input_panel"):
-            st.subheader("💬 에이전트 모드")
-            _render_agent_tab()
-            last = st.session_state.get("last_result")
-            if last and last.get("src") == "agent":
-                _render_result_block()
-            if q := st.chat_input("선택한 데이터에 대해 질문하세요 (예: 총 몇 건인가요?)"):
-                st.session_state.pending_q = q
-                st.rerun()
-    with manual_col:
-        with st.container(border=True, key="manual_input_panel"):
-            st.subheader("⌨️ 수동 입력 모드")
-            _render_manual_tab()
-            last = st.session_state.get("last_result")
-            if last and last.get("src") == "manual":
-                _render_result_block()
+    with input_col:
+        if mode == "agent":
+            with st.container(border=True, key="agent_input_panel"):
+                st.subheader("💬 에이전트 모드")
+                _render_agent_tab()
+                last = st.session_state.get("last_result")
+                if last and last.get("src") == "agent":
+                    _render_result_block()
+                if q := st.chat_input("선택한 데이터에 대해 질문하세요 (예: 총 몇 건인가요?)"):
+                    st.session_state.pending_q = q
+                    st.rerun()
+        else:
+            with st.container(border=True, key="manual_input_panel"):
+                st.subheader("⌨️ 수동 입력 모드")
+                _render_manual_tab()
+                last = st.session_state.get("last_result")
+                if last and last.get("src") == "manual":
+                    _render_result_block()
 
 
 # [0928 수정] History 섹션
@@ -383,6 +409,12 @@ def _render_history_panel() -> None:
 # [0928 수정] 사이드바 'Chat history' 블록 제거.
 #   기록의 단일 출처가 SQLite query_log + 아래 History 섹션으로 옮겨가면서
 #   세션 messages 기반 목록은 데이터셋과 무관하게 쌓여 stale 값을 보여주는 문제가 있었다.
+
+
+# 수동 입력 패널이 숨겨진 동안(에이전트 모드) Streamlit 이 위젯 키를 지우지 않도록
+# 매 실행마다 다시 대입해 둔다. 모드를 오가도 작성 중인 코드가 유지된다.
+if "manual_code" in st.session_state:
+    st.session_state.manual_code = st.session_state.manual_code
 
 
 # ── 헤더 ────────────────────────────────────────
@@ -476,7 +508,8 @@ if not st.session_state.is_admin:
 st.divider()
 
 
-# Schema and both input panels share one row.
+# 모드 선택 버튼 → 선택한 입력 패널만 스키마와 한 줄에 표시.
+_render_mode_buttons()
 _render_editor_panel()
 
 

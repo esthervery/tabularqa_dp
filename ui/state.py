@@ -60,6 +60,7 @@ DEFAULTS = {
     "pipe": None,
 
     # 콘솔 상태
+    "input_mode":  None,       # "agent" | "manual" | None(아직 선택 안 함)
     "pending_q":   None,
     "manual_code": "    return df.shape[0]",
     "last_result": None,
