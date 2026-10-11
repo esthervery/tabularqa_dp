@@ -259,11 +259,12 @@ def _render_result_block() -> None:
         # 결과가 None 이면 예전에는 'None' 문자열이 그대로 보였다.
         # 사유가 있으면 그대로, 없으면 일반 문구로 대체한다.
         detail = res["value"]
-        notice = st.info if res.get("src") == "manual" else st.error
-        notice(
-            "결과를 얻지 못했습니다." if detail is None else str(detail),
-            icon="⚠️",
-        )
+        message = "결과를 얻지 못했습니다." if detail is None else str(detail)
+        if res.get("src") == "manual":
+            # 수동 실행 실패는 오류 경고가 아니라 안내 문구로만 조용히 보여준다.
+            st.caption(f"{message} · ε 차감 없음")
+        else:
+            st.error(message, icon="⚠️")
         return
 
     # 값 표시 형식. 자르지 않는다 — 기존 [:24] 슬라이스가 리스트·문자열의
@@ -271,11 +272,9 @@ def _render_result_block() -> None:
     # 숫자 판별에 numbers 를 쓰는 이유: 실행기가 numpy 스칼라를 돌려줄 수 있는데
     # np.int64 는 int 의 서브클래스가 아니라 내장 isinstance 로는 놓친다.
     # bool 은 Integral 의 서브클래스이므로 먼저 걸러낸다.
+    # 표·리스트·딕셔너리는 아래 결과 상자 안에서 한 번만 그린다.
+    # (예전에는 상자 위에 표/JSON 을, 상자 안에 같은 값을 문자열로 또 그려 두 번 보였다.)
     v = res["value"]
-    if isinstance(v, (pd.DataFrame, pd.Series)):
-        st.dataframe(v, width="stretch")
-    elif isinstance(v, (list, dict, tuple)):
-        st.json(v)
     if v is None:
         val_str = "—"
     elif isinstance(v, bool):
@@ -292,7 +291,17 @@ def _render_result_block() -> None:
     with c_res:
         with st.container(border=True):
             st.caption("실행 결과")
-            st.write(val_str)
+            if isinstance(v, (pd.DataFrame, pd.Series)):
+                st.dataframe(v, width="stretch", height=min(35 * (len(v) + 1) + 3, 320))
+            elif isinstance(v, (list, tuple, set)):
+                items = list(v)
+                st.caption(f"{len(items):,}개 항목")
+                st.dataframe(pd.DataFrame({"값": items}), width="stretch",
+                             height=min(35 * (len(items) + 1) + 3, 320))
+            elif isinstance(v, dict):
+                st.json(v, expanded=False)
+            else:
+                st.write(val_str)
             st.caption("아직 노이즈가 적용되지 않은 참값입니다.")
     with c_eps:
         st.metric("소모 ε", f"{st.session_state.eps:.2f}")
