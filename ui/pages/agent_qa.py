@@ -39,6 +39,21 @@ theme.inject_global_css()
 # 렌더링 세부 함수들 (top-level 스크립트에서 호출되기 전에 정의)
 # ─────────────────────────────────────────────────
 
+def _short_dtype(dtype: str) -> str:
+    """Arrow 타입 문자열을 스키마 표에 맞는 짧은 이름으로 바꾼다.
+
+    예: 'dictionary<values=string, indices=int32, ordered=0>' → 'category',
+        'timestamp[us, tz=UTC]' → 'timestamp', 'list<item: string>' → 'list'
+    """
+    for prefix, short in (("dictionary<", "category"), ("timestamp", "timestamp"),
+                          ("list<", "list"), ("large_list<", "list"),
+                          ("struct<", "struct"), ("double", "float"),
+                          ("large_string", "string")):
+        if dtype.startswith(prefix):
+            return short
+    return dtype
+
+
 def _render_schema_panel() -> None:
     with st.expander("Schema · 컬럼 목록", expanded=False):
         try:
@@ -50,14 +65,16 @@ def _render_schema_panel() -> None:
         st.caption(f"{len(sch)}개 컬럼 · 값 미리보기 없음")
         kw = st.text_input("검색", placeholder="🔍 컬럼명 필터",
                            label_visibility="collapsed")
-        view = sch[sch["column"].str.contains(kw, case=False)] if kw else sch
+        # 컬럼명에 ?, ( 같은 문자가 많아 정규식이 아닌 일반 문자열로 찾는다.
+        view = sch[sch["column"].str.contains(kw, case=False, regex=False)] if kw else sch
+        view = view.assign(dtype=view["dtype"].map(_short_dtype))
         st.dataframe(
             view, hide_index=True, width='stretch',
             height=min(38 * (len(view) + 1) + 3, 400),
             column_config={
                 # 컬럼명이 잘리지 않도록 이름 열에 폭을 몰아주고 타입 열은 좁게 둔다.
                 "column": st.column_config.TextColumn("컬럼", width="large"),
-                "dtype":  st.column_config.TextColumn("타입", width="small"),
+                "dtype":  st.column_config.TextColumn("타입", width=90),
             },
         )
 
@@ -164,6 +181,27 @@ def _run_agent_streaming(slot, q: str) -> None:
     st.rerun()
 
 
+def _summarize_answer(value) -> str:
+    """History 에 남길 답 문자열. 표·리스트는 통째로 문자열화하지 않고 요약한다."""
+    def head(items, n=3):
+        items = list(items)
+        text = ", ".join(str(x) for x in items[:n])
+        return text + (" …" if len(items) > n else "")
+
+    if value is None:
+        return "실행 완료 (반환값 없음)"
+    if isinstance(value, pd.DataFrame):
+        return f"표 {value.shape[0]:,}행 × {value.shape[1]:,}열"
+    if isinstance(value, pd.Series):
+        pairs = (f"{k}: {v}" for k, v in value.items())
+        return f"{len(value):,}개 값 · {head(pairs)}"
+    if isinstance(value, (list, tuple, set)):
+        return f"{len(value):,}개 항목 · {head(value)}"
+    if isinstance(value, dict):
+        return f"{len(value):,}개 키 · {head(value)}"
+    return str(value)
+
+
 def _run_manual_code() -> None:
     if not state.can_spend(st.session_state.eps):
         st.session_state.last_result = {
@@ -190,7 +228,7 @@ def _run_manual_code() -> None:
     value = result.get("value") if ok else result["message"]
     if ok and not state.spend(st.session_state.eps, "manual", "직접 코드 실행"):
         ok, value = False, "사용 가능한 예산이 부족합니다."
-    answer = "실행 완료 (반환값 없음)" if ok and value is None else str(value)
+    answer = _summarize_answer(value) if ok else str(value)
     state.record_query("(수동 코드 실행)", answer, code=code, ok=ok)
     st.session_state.last_result = {
         "value": value, "ok": ok, "src": "manual", "calls": 0,
@@ -365,6 +403,8 @@ def _render_query_card(r: dict) -> None:
         answer = r["answer"] or "—"
         if not r["ok"] and any(token in answer for token in ("__CODE_ERROR__", "__TIMEOUT__", "Traceback")):
             answer = "실행을 완료하지 못했습니다. 코드를 수정한 뒤 다시 실행해주세요."
+        if len(answer) > 200:   # 요약 도입 전에 통째로 저장된 기록
+            answer = answer[:200].rstrip() + " …"
         st.write(f"**A.** {answer}")
         st.caption(
             f"{(r['asked_at'] or '').replace('T', ' ')} · "
