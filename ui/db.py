@@ -3,7 +3,7 @@
 
 분석 대상 데이터(parquet)와 완전히 분리된 dp_demo.db 파일을 쓴다.
 
-테이블 4개
+테이블 5개
     users                  로그인 계정 + 사용자별 개인 ε 상한(예산 원장 용도)
     budget_requests        분석가의 리스크 업그레이드 신청 워크플로우
                            (pending / approved / partial / rejected)
@@ -12,12 +12,21 @@
     user_policy_override   (username × db_name) 개인 오버라이드.
                            예산 신청이 승인되면 여기에 기록.
                            Agent Console 진입/새로고침 시 이 값이 우선 적용.
+    query_log              (username × db_name) 질의·응답 기록 + 소모 ε.
+                           누적 소모 ε = SUM(eps_spent)  ·  질의 수 = COUNT(*)
+                           → 데이터셋별 ε 원장과 History 의 단일 출처.
 
 주요 API
     init()                              스키마 준비 + 데모 계정 seed
 
     verify / create_user / user_exists / list_users
     get_eps_cap / grant_eps
+
+    ── 질의 기록 / 데이터셋별 ε 원장 ──
+    log_query(user, db, question, answer, code?, ok?, eps_spent?)
+    list_queries(user, db, limit=?)       데이터셋별 질의·응답 history
+    count_queries(user, db, only_ok=?)    해당 데이터셋 질의 횟수
+    spent_epsilon(user, db)               해당 데이터셋 누적 소모 ε
 
     ── 리스크 매핑 ──
     RISK_TO_EPSILON                     {1..5: 2..10}
@@ -115,6 +124,23 @@ CREATE TABLE IF NOT EXISTS user_policy_override (
 );
 CREATE INDEX IF NOT EXISTS ix_override_scope
     ON user_policy_override(username, db_name);
+
+-- 질의·응답 기록 (0923 추가)
+-- 데이터셋별 ε 원장(SUM(eps_spent))과 질의 History 의 단일 출처.
+-- 예산 소모 없이 끝난 시도(실행 실패·예산 초과 차단)는 ok=0, eps_spent=0 으로 남는다.
+CREATE TABLE IF NOT EXISTS query_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    asked_at   TEXT NOT NULL,
+    username   TEXT NOT NULL,
+    db_name    TEXT NOT NULL,
+    question   TEXT,
+    answer     TEXT,
+    code       TEXT,
+    ok         INTEGER NOT NULL DEFAULT 1,
+    eps_spent  REAL NOT NULL DEFAULT 0.0
+);
+CREATE INDEX IF NOT EXISTS ix_query_scope
+    ON query_log(username, db_name, id DESC);
 """
 
 
@@ -451,3 +477,61 @@ def risk_level_of(username: str | None, db_name: str) -> int:
 
 def total_epsilon_of(username: str | None, db_name: str) -> float:
     return float(get_effective_policy(username, db_name)["total_epsilon"])
+
+
+# ── 질의 기록 (query_log) ───────────────────────
+# 모든 조회는 (username × db_name) 스코프다 → 데이터셋을 바꾸면
+# 누적 소모 ε 과 질의 수·history 가 각각 그 데이터셋 기준으로 바뀐다.
+
+def log_query(username: str, db_name: str,
+              question: str, answer: str,
+              code: str | None = None,
+              ok: bool = True,
+              eps_spent: float = 0.0) -> int:
+    """질의 1건 INSERT. 반환값은 행 id."""
+    with connect() as con:
+        cur = con.execute(
+            "INSERT INTO query_log "
+            "  (asked_at, username, db_name, question, answer, code, ok, eps_spent) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (dt.datetime.now().isoformat(timespec="seconds"),
+             username, db_name, question, answer, code,
+             int(bool(ok)), float(eps_spent)),
+        )
+        return int(cur.lastrowid)
+
+
+def list_queries(username: str, db_name: str, limit: int = 100) -> list[dict]:
+    """해당 (계정 × 데이터셋) 의 질의 기록 (최신순)."""
+    with connect() as con:
+        rows = con.execute(
+            "SELECT * FROM query_log WHERE username = ? AND db_name = ? "
+            "ORDER BY id DESC LIMIT ?",
+            (username, db_name, int(limit)),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def count_queries(username: str, db_name: str, only_ok: bool = True) -> int:
+    """해당 (계정 × 데이터셋) 의 질의 횟수.
+
+    only_ok=True  → 응답을 받은 질의만 (기본값)
+    only_ok=False → 실행 실패·예산 초과 차단까지 포함한 시도 횟수
+    """
+    q = ("SELECT COUNT(*) AS c FROM query_log "
+         "WHERE username = ? AND db_name = ?")
+    if only_ok:
+        q += " AND ok = 1"
+    with connect() as con:
+        return int(con.execute(q, (username, db_name)).fetchone()["c"])
+
+
+def spent_epsilon(username: str, db_name: str) -> float:
+    """해당 (계정 × 데이터셋) 의 누적 소모 ε."""
+    with connect() as con:
+        row = con.execute(
+            "SELECT COALESCE(SUM(eps_spent), 0.0) AS s FROM query_log "
+            "WHERE username = ? AND db_name = ?",
+            (username, db_name),
+        ).fetchone()
+    return float(row["s"])

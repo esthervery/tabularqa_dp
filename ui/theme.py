@@ -1,14 +1,4 @@
-"""시각화 유틸리티 (개발 단계용 · 최소 CSS).
-
-이 모듈이 제공하는 것:
-    inject_global_css()  - 각 페이지 상단에서 한 번 호출. 지금은 no-op 에 가깝다.
-    donut_gauge(...)     - 진행률 도넛(SVG) HTML 문자열. st.markdown 으로 렌더.
-    bar_gauge(...)       - 진행률 막대(SVG) HTML 문자열. st.markdown 으로 렌더.
-
-CSS 를 걷어냈기 때문에 컨테이너, 버튼, 배지 같은 요소는
-Streamlit 기본 스타일 그대로 노출된다.
-게이지처럼 시각적으로 필요한 것들만 SVG 로 남긴다.
-"""
+"""Shared workspace styling and privacy budget gauges."""
 from __future__ import annotations
 import math
 import streamlit as st
@@ -24,9 +14,19 @@ PALETTE = {
 
 
 def inject_global_css() -> None:
-    """개발 단계에서는 거의 아무것도 하지 않는다.
-    운영 배포 시 이 함수의 st.markdown 을 채우면 전역 CSS 를 다시 켤 수 있다."""
-    return None
+    """Apply the shared workspace design from the supplied HTML reference."""
+    from pathlib import Path
+    st.markdown("<style>" + Path(__file__).with_name("design.css").read_text() + "</style>", unsafe_allow_html=True)
+
+
+def brand_block() -> None:
+    st.markdown('<div class="brand"><div class="brand-mark">ε</div><div><div class="brand-name">DP Agent</div><div class="brand-sub">Differential Privacy Workspace</div></div></div>', unsafe_allow_html=True)
+
+
+def role_block(username: str, is_admin: bool) -> None:
+    from html import escape
+    role = "관리자" if is_admin else "분석가"
+    st.markdown(f'<div class="dp-role"><span class="dp-pill">{role}</span><strong>{escape(username)}</strong></div>', unsafe_allow_html=True)
 
 
 # ── 도넛 게이지 ─────────────────────────────────────────────

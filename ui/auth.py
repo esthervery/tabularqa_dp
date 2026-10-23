@@ -20,7 +20,7 @@ def render_login() -> None:
         _render_intro()
 
     with right:
-        with st.container(border=True):
+        with st.container(border=False, key="login_card"):
             st.subheader("Console 접속")
 
             tab_in, tab_up = st.tabs(["로그인", "회원가입"])
@@ -36,16 +36,31 @@ def render_login() -> None:
 
 def _render_intro() -> None:
     """좌측 소개 컬럼. 서비스 컨셉 3문장 + 특징 3개."""
-    st.title("안전한 경계 안에서\n데이터에게 질문하기")
-    st.write(
-        "분석가는 원본 데이터에 직접 접근하지 않고, "
-        "LLM 에이전트가 작성·실행한 코드의 결과만 "
-        "차분 프라이버시 보호 아래 받아봅니다."
-    )
     st.markdown(
-        "1. **자연어 질의** — 스키마만 참고해 pandas 코드를 스트리밍 생성  \n"
-        "2. **ε 예산 원장** — 질의마다 소비된 ε 을 개인별 상한과 함께 추적  \n"
-        "3. **관리자 결재** — 예산 부족 시 사유와 함께 증액을 요청·승인"
+        """<div class="dp-hero">
+<div style="display:flex;align-items:center;gap:10px;">
+<div class="brand-mark" style="width:38px;height:38px;font-size:18px;">ε</div>
+<div>
+<div class="brand-name">DP Agent</div>
+<div class="brand-sub">Differential Privacy Workspace</div>
+</div>
+</div>
+<h2>안전한 경계 안에서<br/>데이터에게 질문하기</h2>
+<p>분석가는 원본 데이터에 직접 접근하지 않고, LLM 에이전트가 작성·실행한 코드의 결과만 차분 프라이버시 보호 아래 받아봅니다.</p>
+<div class="bullet">
+<div class="bullet-dot">1</div>
+<div class="bullet-text"><b>자연어 질의</b><br/><span>스키마만 참고해 pandas 코드를 스트리밍 생성.</span></div>
+</div>
+<div class="bullet">
+<div class="bullet-dot">2</div>
+<div class="bullet-text"><b>ε 예산 원장</b><br/><span>질의마다 소비된 ε 을 개인별 상한과 함께 추적.</span></div>
+</div>
+<div class="bullet">
+<div class="bullet-dot">3</div>
+<div class="bullet-text"><b>관리자 결재</b><br/><span>예산 부족 시 사유와 함께 리스크 업그레이드를 요청·승인.</span></div>
+</div>
+</div>""",
+        unsafe_allow_html=True,
     )
 
 
@@ -69,7 +84,8 @@ def _render_login_form() -> None:
         st.session_state.username      = user["username"]
         st.session_state.is_admin      = bool(user["is_admin"])
         st.session_state.eps_cap       = float(user["eps_cap"])
-        st.session_state.spent         = 0.0
+        # 누적 소모 ε 과 질의 기록은 SQLite(query_log)에 (계정 × 데이터셋) 단위로
+        # 남으므로 세션에서 초기화하지 않는다.
         state.log("auth", f"{user['username']} 로그인")
         st.rerun()
 
