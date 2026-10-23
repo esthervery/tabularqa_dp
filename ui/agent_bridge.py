@@ -104,15 +104,15 @@ def stream_code(question: str, db_name: str,
     st.session_state._last_trace = trace
 
 
-def run_code(code: str, db_name: str):
-    """수동 입력 코드도 에이전트와 동일한 샌드박스로 실행.
+def run_code(code: str, db_name: str) -> dict:
+    """수동 입력 코드를 별도 프로세스에서 실행한다.
 
-    성공 시 결과값, 실패 시 __CODE_ERROR__/__TIMEOUT__ 접두어 문자열.
+    반환: {"ok": bool, "value": Any, "message": str}
+    에이전트 파이프라인(openai/botocore)에 의존하지 않는다.
     """
+    from ui.manual_executor import execute
     try:
-        import dp_agent_wrap as W
-        import core.utils as utils
-        ex = W.InlineStatementExecutor(utils.generic_load_table, timeout=30)
-        return ex((code, db_name))
-    except Exception as e:
-        return f"__CODE_ERROR__: {e}"
+        table = catalog.table_path(db_name)
+    except Exception:
+        return {"ok": False, "message": "선택한 데이터셋을 불러오지 못했습니다."}
+    return execute(code, str(table))

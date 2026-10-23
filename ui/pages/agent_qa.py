@@ -165,24 +165,26 @@ def _run_agent_streaming(slot, q: str) -> None:
 
 def _run_manual_code() -> None:
     if not state.can_spend(st.session_state.eps):
-        st.error(
-            "ε 예산을 초과했습니다. 예산 추가 요청을 고려하세요.",
-            icon="🚫",
-        )
+        st.error("ε 예산을 초과했습니다. 예산 추가 요청을 고려하세요.", icon="🚫")
         return
-    r = ab.run_code(st.session_state.manual_code, st.session_state.db_name)
-    ok = not str(r).startswith(("__CODE_ERROR__", "__TIMEOUT__"))
-    if ok:
-        state.spend(st.session_state.eps, "manual", "직접 코드 실행")
-    # 수동 실행도 같은 데이터셋 history 에 남긴다 (질문란이 없으므로 수동 실행으로 표기).
-    state.record_query(
-        "(수동 코드 실행)",
-        str(r) if ok else f"실행 실패 — {r}",
-        code=st.session_state.manual_code,
-        ok=ok,
-    )
+    code = st.session_state.manual_code
+    with st.spinner("선택한 데이터셋에서 실행 중…"):
+        try:
+            result = ab.run_code(code, st.session_state.db_name)
+        except Exception:
+            result = {"ok": False, "message": "코드를 실행하지 못했습니다."}
+    if not isinstance(result, dict):
+        result = {"ok": False, "message": "실행 결과 형식을 읽지 못했습니다."}
+
+    ok = result.get("ok", False)
+    value = result.get("value") if ok else result.get("message")
+    if ok and not state.spend(st.session_state.eps, "manual", "직접 코드 실행"):
+        ok, value = False, "사용 가능한 예산이 부족합니다."
+
+    answer = "실행 완료 (반환값 없음)" if ok and value is None else str(value)
+    state.record_query("(수동 코드 실행)", answer, code=code, ok=ok)
     st.session_state.last_result = {
-        "value": r, "ok": ok, "src": "manual", "calls": 0,
+        "value": value, "ok": ok, "src": "manual", "calls": 0,
     }
     st.rerun()
 
