@@ -1,6 +1,5 @@
 .env
 *.zip
-competition/
 competition_origin/
 results/
 
