@@ -1,6 +1,7 @@
 .env
 *.zip
 competition/
+competition_origin/
 results/
 
 __pycache__

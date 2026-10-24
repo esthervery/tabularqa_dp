@@ -28,7 +28,7 @@ import numbers
 import traceback
 
 import streamlit as st
-from ui import agent_bridge as ab, boot, db, state, theme
+from ui import agent_bridge as ab, boot, db, guardrail, state, theme
 
 
 theme.inject_global_css()
@@ -78,6 +78,27 @@ def _stream_compact_code(stream) -> str:
 
 def _run_agent_streaming(slot, q: str) -> None:
     with slot.container():
+        # [가드레일] 통계량 질의만 파이프라인으로 통과
+        try:
+            with st.spinner("질의 유형 확인 중…"):
+                verdict = guardrail.check(q, st.session_state.db_name)
+        except Exception as e:                     # 모듈 자체 오류도 fail-closed
+            verdict = guardrail.Verdict(
+                False, f"판정 실패: {type(e).__name__}", "error",
+                failed=True, question=q, dataset=st.session_state.db_name,
+            )
+
+        if not verdict.allowed:
+            st.warning(verdict.user_message())
+            st.session_state._last_trace = {
+                "question": q,
+                "dataset": st.session_state.db_name,
+                "blocked": True,
+                "reason": verdict.reason,
+                "category": verdict.category,
+            }
+            return
+        
         stt = None
         try:
             with st.status("에이전트가 코드를 작성 중…", expanded=True) as stt:
