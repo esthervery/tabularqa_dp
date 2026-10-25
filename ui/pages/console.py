@@ -84,8 +84,6 @@ def render() -> None:
     design.inject()
     _inject_policies()
     is_admin = bool(st.session_state.get("is_admin"))
-    st.markdown(design.topbar("질의 콘솔", "Admin" if is_admin else "Workspace"),
-                unsafe_allow_html=True)
 
     if st.session_state.get("db_name") not in ORD:
         st.session_state.db_name = ORD[0]
@@ -104,22 +102,14 @@ def _band_head(cur: str) -> None:
     eps = float(st.session_state.get("eps") or EPS)
     remain = max(0, int((total - spent) / eps + 1e-9))
 
-    left, right = st.columns([3.05, 1.35], vertical_alignment="center")
+    left, right = st.columns([1, 1], vertical_alignment="center")
     with left:
-        # key 를 쓰지 않고 index 로만 현재 데이터셋을 표현한다.
-        #
-        # (v17 버그) key="ds_pick" + "불일치하면 세션 값을 cur 로 덮어쓰기" 조합은
-        # 사용자의 선택을 지웠다. 선택 직후 rerun 에서 세션["ds_pick"] 은 새 값,
-        # cur 는 아직 옛 값이라 조건이 참이 되고 → 방금 고른 값이 옛 값으로 덮인 뒤
-        # selectbox 가 그 옛 값을 그렸다. 그래서 Telco 로 계속 되돌아갔다.
-        #
-        # key 없는 selectbox 의 위젯 ID 에는 index 가 포함되므로, index 를 cur 에서
-        # 계산하면 ① 사용자 선택은 그대로 유지되고 ② 다른 화면이 db_name 을 바꾼
-        # 경우에도 위젯이 그 값으로 다시 만들어진다. 양방향 모두 이 한 줄로 해결된다.
+        # key 를 쓰지 않고 index 로만 현재 데이터셋을 표현한다. (v17 버그 메모는 기존 주석 참고)
         pick = st.selectbox(
             "질의 대상", ORD, index=ORD.index(cur),
             format_func=lambda k: f"{TL.get(k, k)}  ·  {k}",
             label_visibility="collapsed",
+            width=400,                     # 선택란이 불필요하게 길어지지 않도록 고정 폭
         )
         if pick != cur:
             st.session_state.db_name = pick
@@ -127,27 +117,22 @@ def _band_head(cur: str) -> None:
             st.rerun()
 
     with right:
-        b, d = st.columns([1.05, 1], vertical_alignment="center")
-        with b:
+        with st.container(horizontal=True, horizontal_alignment="right",
+                          vertical_alignment="center", gap="medium"):
             # 분석가 → 예산 신청 / 관리자 → 예산 관리
-            # (관리자에게는 budget_request 페이지가 등록되어 있지 않다)
             is_admin = bool(st.session_state.get("is_admin"))
             rel   = "ui/pages/budget_admin.py" if is_admin else "ui/pages/budget_request.py"
             label = "📊 예산 관리" if is_admin else "↓ 예산 신청"
             title = "예산 관리"   if is_admin else "예산 신청"
 
             target = st.session_state.get("page_map", {}).get(rel)
-            if st.button(label, key="to_budget", use_container_width=True,
-                         disabled=target is None):
-                st.session_state.nav_active = title   # 상단 탭 강조도 함께 이동
+            if st.button(label, key="to_budget", width=150, disabled=target is None):
+                st.session_state.nav_active = title
                 st.switch_page(target)
-        with d:
-            st.markdown(
-                design.donut(spent / total if total else 0.0,
-                             f"{spent:.2f} / {total:.2f} ε",
-                             f"잔여 {remain}회"),
-                unsafe_allow_html=True,
-            )
+
+            # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
+            st.markdown(design.budget_ring(spent, total, remain), unsafe_allow_html=True)
+
 
 
 def _band_body(cur: str) -> None:

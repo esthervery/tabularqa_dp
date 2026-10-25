@@ -103,40 +103,56 @@ h3{font-size:1rem !important}   h4{font-size:.9rem !important}
 .navbrand .who b{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
 .navbrand .who span{font-size:10.5px;letter-spacing:.04em;color:var(--mid);margin-top:2px}
 
-/* 탭 — 레퍼런스처럼 테두리 없는 텍스트 링크. 선택 항목은 진한 글자 + indigo 밑줄.
-   .stApp 를 앞에 붙여 아래 '버튼' 공통 규칙보다 우선순위를 높인다. */
-.stApp [class*="st-key-nav_"] button{
+/* 탭 — 텍스트 링크. 선택 = 볼드 + indigo 글자색 (밑줄 없음).
+   탭·로그아웃을 모두 같은 36px 상자 + flex 중앙 정렬로 맞춰 글씨 높이를 통일한다.
+   div 를 붙여 뒤쪽의 공통 버튼 규칙보다 우선순위를 높인다. */
+.stApp div[class*="st-key-nav_"] button{
+  height:36px !important; min-height:36px !important;
+  padding:0 10px !important; margin:0 !important;
   border:none !important; background:transparent !important;
-  box-shadow:none !important; border-radius:0 !important;
+  box-shadow:none !important; border-radius:8px !important;
+  display:inline-flex !important; align-items:center !important; justify-content:center !important;
   color:var(--mid) !important; font-size:14px !important; font-weight:500 !important;
-  padding:6px 2px !important; margin:0 8px !important;
-  min-height:0 !important; height:auto !important;
-  letter-spacing:-.012em; white-space:nowrap;
-  transition:color .15s, box-shadow .15s;
+  line-height:1 !important; white-space:nowrap; letter-spacing:-.012em;
+  transition:color .15s;
 }
-/* 라벨 <p> 가 전역 p 색상을 받지 않고 버튼 색을 따르도록 */
-.stApp [class*="st-key-nav_"] button p{
-  color:inherit !important; font-size:inherit !important;
-  font-weight:inherit !important; margin:0 !important;
+.stApp div[class*="st-key-nav_"] button p,
+.stApp div[class*="st-key-nav_"] button div{
+  margin:0 !important; line-height:1 !important; color:inherit !important;
+  font-size:inherit !important; font-weight:inherit !important;
 }
-.stApp [class*="st-key-nav_"] button:hover,
-.stApp [class*="st-key-nav_"] button:focus,
-.stApp [class*="st-key-nav_"] button:active{
-  background:transparent !important; color:var(--ink) !important; box-shadow:none !important;
+.stApp div[class*="st-key-nav_"] button:hover,
+.stApp div[class*="st-key-nav_"] button:focus,
+.stApp div[class*="st-key-nav_"] button:active{
+  color:var(--ink) !important; background:transparent !important; box-shadow:none !important;
 }
 /* 현재 페이지 */
-.stApp [class*="st-key-nav_"] button[kind="primary"],
-.stApp [class*="st-key-nav_"] button[kind="primary"]:hover{
-  background:transparent !important; color:var(--ink) !important; font-weight:700 !important;
-  box-shadow:inset 0 -2px 0 var(--pri) !important;
+.stApp div[class*="st-key-nav_on_"] button,
+.stApp div[class*="st-key-nav_on_"] button:hover{
+  color:var(--pri2) !important; font-weight:700 !important;
 }
-/* 로그아웃 — 더 옅은 텍스트, hover 시 rose */
-.stApp .st-key-nav_logout button{
-  color:var(--dim) !important; font-size:13px !important; margin:0 0 0 4px !important;
+/* 로그아웃 */
+.stApp div.st-key-nav_logout button{
+  color:var(--dim) !important; font-size:13px !important; padding:0 4px 0 8px !important;
 }
-.stApp .st-key-nav_logout button:hover{
-  color:var(--dan2) !important; background:transparent !important;
+.stApp div.st-key-nav_logout button:hover{ color:var(--dan2) !important; }
+
+/* 상단 바 안의 HTML 블록도 같은 36px 기준선 */
+.stApp div.st-key-navbar div.navuser{
+  height:36px; display:flex; align-items:center; gap:8px; margin:0 !important;
 }
+.stApp div.st-key-navbar div.navsep{ height:18px; margin:0 6px !important; align-self:center; }
+.stApp div.navbrand{ min-height:44px; display:flex; align-items:center; margin:0 !important; }
+
+/* 구분선 — 위아래 여백 축소 */
+.stApp div.navrule{ margin:2px 0 0 !important; }
+
+/* 콘솔 ε 예산 링 (큰 도넛) */
+.stApp div.bring{ display:flex; align-items:center; gap:12px; }
+.bring .bt{ text-align:right; line-height:1.35; }
+.bring .bt b{ display:block; font-family:var(--mono); font-size:17px; font-weight:600; color:var(--ink); }
+.bring .bt span{ font-size:12px; color:var(--dim); }
+.bring svg text{ font-family:var(--mono); font-size:13px; font-weight:600; fill:#1e293b; }
 
 /* 계정 (우측) */
 .navuser{display:flex;align-items:center;gap:8px;padding:0 2px 0 6px}
@@ -384,6 +400,18 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .epsb{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--pri2);
   background:var(--prisoft);border:1px solid var(--priline);border-radius:7px;
   padding:3px 9px;white-space:nowrap}
+
+/* ── 채팅 히스토리 카드 ── */
+.hcard{border:1px solid var(--bd);border-radius:12px;background:#fff;
+  padding:14px 16px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.hcard .hhead{display:flex;justify-content:space-between;align-items:center;min-height:20px}
+.hcard .ht{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.hcard .hbad{font-size:11px;font-weight:600;color:var(--dan2);background:var(--dansoft);
+  border:1px solid var(--danline);border-radius:7px;padding:2px 8px}
+.hcard .hq{margin:6px 0 10px;font-size:14px;font-weight:600;color:var(--ink);line-height:1.5}
+.hmsg{padding:12px 16px;background:var(--dansoft);color:var(--dan2);
+  font-size:12.5px;line-height:1.65;white-space:pre-wrap}
+
 .warn{border:1px solid var(--danline);background:var(--dansoft);color:var(--dan2);
   border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6}
 .hintline{border:1px solid var(--wrnline);background:var(--wrnsoft);color:var(--wrn2);
@@ -799,3 +827,53 @@ def agent_pending() -> str:
 def agent_error(msg: str) -> str:
     """오류/차단 메시지 말풍선."""
     return f'<div class="msg a"><div class="av">ε</div><div class="bub">{warn(msg)}</div></div>'
+
+# ── 채팅 히스토리 카드 ──────────────────────────────────
+# 콘솔의 응답 카드와 같은 부품(code_block · fmt_answer · .ares · .epsb)을 재사용한다.
+
+_FAIL_PREFIX = re.compile(r"^\[(?:blocked|error)\]\s*")
+
+
+def history_card(when: str, question: str, code: str, ans: str, *,
+                 ok: bool, eps: float, label: str = "결과") -> str:
+    """기록 1건 — 시각/질문 + (코드 블록) + (결과 또는 차단·실패 메시지)."""
+    bad = '<span class="hbad">차단·실패</span>' if not ok else ""
+    head = (f'<div class="hhead"><span class="ht">{_h.escape(when)}</span>{bad}</div>'
+            f'<div class="hq">{_h.escape(question)}</div>')
+
+    inner = code_block(code) if code else ""
+    if ok and ans:
+        v = fmt_answer(ans)
+        multi = " multi" if "\n" in v else ""
+        inner += (f'<div class="ares"><div class="rk">{_h.escape(str(label))}</div>'
+                  f'<div class="rrow"><div class="rv{multi}">{_h.escape(v)}</div>'
+                  f'<span class="epsb">ε {eps:.2f} 소모</span></div></div>')
+    elif not ok and ans:
+        msg = _FAIL_PREFIX.sub("", ans)[:600]
+        inner += f'<div class="hmsg">{_h.escape(msg)}</div>'
+
+    body = f'<div class="agcard">{inner}</div>' if inner else ""
+    return '<div class="hcard">' + head + body + "</div>"
+
+
+# ── 콘솔 ε 예산 링 (큰 도넛) ─────────────────────────────
+def budget_ring(spent: float, total: float, remain: int, *, size: int = 72) -> str:
+    """'0.00 / 2.00 ε · 잔여 20회' + 사용률 링. 80% 이상 쓰면 rose 로 바뀐다."""
+    ratio = max(0.0, min(1.0, spent / total if total else 0.0))
+    stroke = 8
+    r = (size - stroke) / 2
+    c = size / 2
+    circ = 2 * math.pi * r
+    dash = circ * ratio
+    tone = "#f43f5e" if ratio >= 0.8 else "#6366f1"
+    return (
+        f'<div class="bring">'
+        f'<div class="bt"><b>{spent:.2f} / {total:.2f} ε</b><span>잔여 {remain}회</span></div>'
+        f'<svg width="{size}" height="{size}" viewBox="0 0 {size} {size}">'
+        f'<circle cx="{c}" cy="{c}" r="{r:.2f}" fill="none" stroke="#e2e8f0" stroke-width="{stroke}"/>'
+        f'<circle cx="{c}" cy="{c}" r="{r:.2f}" fill="none" stroke="{tone}" stroke-width="{stroke}" '
+        f'stroke-linecap="round" stroke-dasharray="{dash:.2f} {circ - dash:.2f}" '
+        f'transform="rotate(-90 {c} {c})"/>'
+        f'<text x="{c}" y="{c + 4.5}" text-anchor="middle">{ratio * 100:.0f}%</text>'
+        f'</svg></div>'
+    )

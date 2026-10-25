@@ -127,31 +127,30 @@ design.inject()
 # 왼쪽: 브랜드 / 오른쪽: 탭 + 계정 + 로그아웃 (한 줄, 오른쪽 정렬)
 top = st.columns([0.34, 0.66], vertical_alignment="center")
 with top[0]:
-    st.markdown(
+    st.html(
         '<div class="navbrand"><div class="mark">D</div>'
-        '<div class="who"><b>DPilot</b><span>PRIVACY WORKSPACE</span></div></div>',
-        unsafe_allow_html=True,
+        '<div class="who"><b>DPilot</b><span>PRIVACY WORKSPACE</span></div></div>'
     )
 
 with top[1]:
     bar = st.container(horizontal=True, horizontal_alignment="right",
-                       vertical_alignment="center", gap="small")
+                       vertical_alignment="center", gap="small", key="navbar")
     with bar:
+        # 현재 페이지는 st.navigation 이 돌려준 pg 기준 — 다른 화면에서 switch_page 해도 정확하다
+        cur_title = getattr(pg, "title", st.session_state.nav_active)
         for i, pg_item in enumerate(FLAT):
             t = getattr(pg_item, "title", "")
-            on = st.session_state.nav_active == t
-            if st.button(t, key=f"nav_{i}",
-                         type=("primary" if on else "tertiary")):
+            on = (t == cur_title)
+            if st.button(t, key=(f"nav_on_{i}" if on else f"nav_{i}"), type="tertiary"):
                 st.session_state.nav_active = t
                 st.switch_page(pg_item)
 
-        st.markdown('<div class="navsep"></div>', unsafe_allow_html=True)
-
-        st.markdown(
+        st.html('<div class="navsep"></div>', width="content")
+        st.html(
             '<div class="navuser"><div class="av">'
             + ("AD" if IS_ADMIN else "AN") + "</div>"
             '<div class="u"><b>' + USER + "</b><span>" + ROLE_LABEL + "</span></div></div>",
-            unsafe_allow_html=True,
+            width="content",
         )
         if st.button("로그아웃", key="nav_logout", type="tertiary"):
             state.logout()

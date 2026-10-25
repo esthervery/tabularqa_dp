@@ -17,8 +17,6 @@ EPS = 0.1
 def render() -> None:
     design.inject()
     is_admin = bool(st.session_state.get("is_admin"))
-    st.markdown(design.topbar("채팅 히스토리", "Admin" if is_admin else "Workspace"),
-                unsafe_allow_html=True)
     st.markdown(design.page_head("채팅 히스토리",
                                  "데이터셋별 질의·응답 기록 — 감사 추적용으로 삭제되지 않습니다"),
                 unsafe_allow_html=True)
@@ -52,28 +50,18 @@ def render() -> None:
         st.markdown(design.empty("이 데이터셋에 대한 기록이 없습니다"), unsafe_allow_html=True)
         return
 
-    blocks: list[str] = []
+    # 기록마다 st.html 로 따로 그린다 (st.markdown + 빈 줄 → 태그 노출 버그 방지)
+    label = fields.SPECS.get(pick, {}).get("measure", {}).get("label", "결과")
     for r in rows:
-        ok = bool(r.get("ok"))
-        bad = "" if ok else '<span class="tag r">차단</span>'
-        eps = float(r.get("eps_spent") or 0.0)
-        code = r.get("code") or ""
-        ans = (r.get("answer") or "").strip()
-        body = ""
-        if ans:
-            body += f'<div class="q" style="margin-top:4px;color:#5a6779">{_esc(ans[:400])}</div>'
-        if code:
-            body += f'<div class="anscode">{design._hl(code)}</div>'
-        blocks.append(
-            '<div class="card" style="margin-bottom:7px">'
-            '<div class="row between">'
-            f'<span class="mono dim" style="font-size:8px">{_t(r.get("asked_at"))}</span>'
-            '<span style="display:flex;gap:5px;align-items:center">'
-            f'{bad}<span class="tag">{eps:.2f} ε</span></span></div>'
-            f'<div class="q" style="margin-top:5px;font-weight:600">{_esc(r.get("question") or "")}</div>'
-            + body + "</div>"
-        )
-    st.markdown("".join(blocks), unsafe_allow_html=True)
+        st.html(design.history_card(
+            _t(r.get("asked_at")),
+            r.get("question") or "",
+            r.get("code") or "",
+            (r.get("answer") or "").strip(),
+            ok=bool(r.get("ok")),
+            eps=float(r.get("eps_spent") or 0.0),
+            label=label,
+        ))
 
 
 def _t(v: str | None) -> str:
