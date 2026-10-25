@@ -123,14 +123,54 @@ st.session_state.page_map = {
 design.inject()
 
 
+# ── 상단 데이터셋 선택 ─────────────────────────────────
+# 공용 값은 db_name(항상 실제 데이터셋). 예산 관리의 '전체' 필터는 adm_ds 에 따로 둔다.
+# key 를 쓰지 않고 index 로만 현재 값을 표현한다 (v17 버그 회피 — console.py 주석 참고).
+ALL_DS = "전체"
+CUR_TITLE = getattr(pg, "title", st.session_state.nav_active)
+DS_MODE = {"예산 관리": "admin", "프라이버시 분석": "none"}.get(CUR_TITLE, "ds")
+
+
+def _ds_label(k: str) -> str:
+    return "전체 데이터셋" if k == ALL_DS else f"{fields.SPECS[k]['title']}  ·  {k}"
+
+
+def _ds_picker() -> None:
+    if DS_MODE == "admin":
+        opts = [ALL_DS] + ENABLED
+        now = st.session_state.setdefault("adm_ds", ALL_DS)
+        if now not in opts:
+            now = ALL_DS
+        pick = st.selectbox("데이터셋", opts, index=opts.index(now), format_func=_ds_label,
+                            label_visibility="collapsed", width=340)
+        if pick != now:
+            st.session_state.adm_ds = pick
+            # 특정 데이터셋을 고르면 공용 값도 맞춰 둔다 → 콘솔로 가도 같은 데이터셋
+            if pick != ALL_DS and pick != st.session_state.db_name:
+                st.session_state.db_name = pick
+                state.reset_console()
+            st.rerun()
+    elif DS_MODE == "ds":
+        now = st.session_state.db_name
+        pick = st.selectbox("데이터셋", ENABLED, index=ENABLED.index(now), format_func=_ds_label,
+                            label_visibility="collapsed", width=340)
+        if pick != now:
+            st.session_state.db_name = pick
+            state.reset_console()
+            st.rerun()   # 맨 위 state.apply_effective_policy() 가 새 데이터셋 기준으로 다시 돈다
+
+
 # ══ 상단 바 ════════════════════════════════════════════
 # 왼쪽: 브랜드 / 오른쪽: 탭 + 계정 + 로그아웃 (한 줄, 오른쪽 정렬)
-top = st.columns([0.34, 0.66], vertical_alignment="center")
+top = st.columns([0.42, 0.58], vertical_alignment="center")
 with top[0]:
-    st.html(
-        '<div class="navbrand"><div class="mark">D</div>'
-        '<div class="who"><b>DPilot</b><span>PRIVACY WORKSPACE</span></div></div>'
-    )
+    with st.container(horizontal=True, vertical_alignment="center", gap="medium"):
+        st.html(
+            '<div class="navbrand"><div class="mark">D</div>'
+            '<div class="who"><b>DPilot</b><span>PRIVACY WORKSPACE</span></div></div>',
+            width="content",
+        )
+        _ds_picker()
 
 with top[1]:
     bar = st.container(horizontal=True, horizontal_alignment="right",
@@ -153,9 +193,10 @@ with top[1]:
             width="content",
         )
         if st.button("로그아웃", key="nav_logout", type="tertiary"):
-            state.logout()
             boot.discard()
+            state.logout()
             st.rerun()
+
 
 if _missing:
     st.markdown('<div class="navwarn">페이지 파일 누락 — '

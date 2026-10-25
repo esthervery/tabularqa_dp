@@ -131,11 +131,21 @@ h3{font-size:1rem !important}   h4{font-size:.9rem !important}
 .stApp div[class*="st-key-nav_on_"] button:hover{
   color:var(--pri2) !important; font-weight:700 !important;
 }
-/* 로그아웃 */
-.stApp div.st-key-nav_logout button{
-  color:var(--dim) !important; font-size:13px !important; padding:0 4px 0 8px !important;
+/* 로그아웃 — 탭과 달리 윤곽선이 있는 작은 버튼 */
+.stApp div.st-key-nav_logout.st-key-nav_logout button{
+  border:1px solid var(--bd) !important;
+  border-radius:8px !important;
+  background:#fff !important;
+  min-height:32px !important; height:32px !important;
+  padding:0 14px !important;
+  color:var(--ink2) !important;
+  box-shadow:none !important;
 }
-.stApp div.st-key-nav_logout button:hover{ color:var(--dan2) !important; }
+.stApp div.st-key-nav_logout.st-key-nav_logout button:hover{
+  border-color:var(--dan2) !important;
+  color:var(--dan2) !important;
+  background:#fff !important;
+}
 
 /* 상단 바 안의 HTML 블록도 같은 36px 기준선 */
 .stApp div.st-key-navbar div.navuser{
@@ -187,6 +197,9 @@ h3{font-size:1rem !important}   h4{font-size:.9rem !important}
 .stButton>button[kind="primary"]:hover,.stFormSubmitButton>button[kind="primary"]:hover{
   background:var(--pri2) !important;border-color:var(--pri2) !important;color:#fff !important;
 }
+
+
+
 
 /* ══ 입력 ═══════════════════════════════════════════════ */
 [data-testid="stWidgetLabel"] p{font-size:12px !important;font-weight:600 !important;
@@ -465,6 +478,20 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .cellbar span{display:block;height:100%;border-radius:9px;
   background:linear-gradient(90deg,#c7d2fe,#6366f1)}
 
+/* 콘솔 오른쪽 — 도넛 블록을 버튼과 같은 폭으로: 글자는 왼쪽 끝, 도넛은 오른쪽 끝 */
+.stApp .bring{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+  margin:0 0 10px 0 !important;
+  padding:0 2px !important;
+  gap:10px !important;
+}
+.stApp .bring svg{flex:0 0 auto}
+  
+
 /* ══ 히스토리 카드 ══════════════════════════════════════ */
 .hcard{border:1px solid var(--bd);border-radius:12px;background:#fff;padding:14px 16px;
   margin-bottom:10px;box-shadow:var(--shadow)}
@@ -490,6 +517,8 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .card .rh{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:12px}
 .card .rsub{font-size:12px;color:var(--mid)}
 </style>
+
+
 """
 
 

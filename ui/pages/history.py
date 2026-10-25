@@ -25,12 +25,9 @@ def render() -> None:
     if cur not in ORD:
         cur = ORD[0]
 
-    left, right = st.columns([1.6, 2], vertical_alignment="center")
-    with left:
-        pick = st.selectbox("데이터셋", ORD, index=ORD.index(cur),
-                            format_func=lambda k: f"{TL.get(k, k)}  ·  {k}", key="hist_ds")
-    with right:
-        limit = st.selectbox("표시 개수", [20, 50, 100, 200], index=1, key="hist_limit")
+    pick = cur   # 데이터셋은 상단 바에서 고른다
+    limit = st.selectbox("표시 개수", [20, 50, 100, 200], index=1, key="hist_limit", width=160)
+
 
     user = st.session_state.get("username") or "analyst"
     rows = db.list_queries(user, pick, limit=int(limit))

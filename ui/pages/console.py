@@ -42,12 +42,70 @@ MAX_THREAD = 10
 TYPE_SECONDS = 1.7
 
 
+# def _store() -> dict:
+#     """대화 저장소 — (계정 → 데이터셋 → 메시지). 계정이 다르면 절대 섞이지 않는다."""
+#     user = st.session_state.get("username") or "_anon"
+#     return st.session_state.setdefault("threads", {}).setdefault(user, {})
+
+
+# def _msgs(db: str) -> list:
+#     return _store().setdefault(db, [])
+
+
+def _user() -> str:
+    return st.session_state.get("username") or "_anon"
+
+
 def _store() -> dict:
-    return st.session_state.setdefault("threads", {})
+    """대화 캐시 — (계정 → 데이터셋 → 메시지). 원본은 query_log 다."""
+    return st.session_state.setdefault("threads", {}).setdefault(_user(), {})
 
 
-def _msgs(db: str) -> list:
-    return _store().setdefault(db, [])
+def _totals() -> dict:
+    """데이터셋별 누적 질의 수 — 계정별로 분리."""
+    return st.session_state.setdefault("thread_totals", {}).setdefault(_user(), {})
+
+
+def _msgs(name: str) -> list:
+    """이 세션에서 처음 여는 (계정 × 데이터셋)이면 query_log 에서 최근 대화를 복원한다."""
+    store = _store()
+    if name not in store:
+        store[name] = _load_thread(name)
+    return store[name]
+
+
+_FAIL = ("[blocked]", "[error]")
+
+
+def _load_thread(name: str) -> list:
+    """query_log → 콘솔 메시지 목록 (오래된 것 → 최신 순). 로그인 계정 것만 조회된다."""
+    user = _user()
+    rows = db.list_queries(user, name, limit=MAX_THREAD)[::-1]   # 최신순으로 오므로 뒤집는다
+    total = db.count_queries(user, name, only_ok=False)
+    _totals()[name] = total
+    start = total - len(rows)
+
+    out = []
+    for i, r in enumerate(rows):
+        ok = bool(r.get("ok"))
+        ans = (r.get("answer") or "").strip()
+        err = None
+        if not ok:
+            for p in _FAIL:                       # history_card 와 같은 접두어 규칙
+                if ans.startswith(p):
+                    ans = ans[len(p):].strip()
+            err, ans = (ans or "실행하지 못했습니다"), ""
+        out.append({
+            "q": r.get("question") or "",
+            "code": r.get("code") or "",
+            "ans": ans,
+            "label": "결과",
+            "err": err,
+            "eps": float(r.get("eps_spent") or 0.0) if ok else None,
+            "meta": f"{name} · {start + i + 1}번째 질의",
+            "fresh": False,                       # 복원분은 타이핑 효과 없음
+        })
+    return out
 
 
 # ── 가드레일 정책 주입 ──────────────────────────────────
@@ -89,50 +147,35 @@ def render() -> None:
         st.session_state.db_name = ORD[0]
     cur = st.session_state.db_name
 
-    _band_head(cur)
-    _band_body(cur)
+    _band(cur)
     _thread(cur)
     _composer(cur)
 
 
-def _band_head(cur: str) -> None:
-    """데이터셋 선택 · 예산 신청 · ε 도넛."""
+def _band(cur: str) -> None:
+    """왼쪽: 필드 힌트 / 오른쪽: ε 도넛 + 그 아래 예산 버튼. 데이터셋 선택은 상단 바."""
     total = float(st.session_state.get("total_epsilon") or 2.0)
     spent = state.spent_of(cur)
     eps = float(st.session_state.get("eps") or EPS)
     remain = max(0, int((total - spent) / eps + 1e-9))
 
-    left, right = st.columns([1, 1], vertical_alignment="center")
+    left, right = st.columns([4.2, 1], gap="medium", vertical_alignment="center")
     with left:
-        # key 를 쓰지 않고 index 로만 현재 데이터셋을 표현한다. (v17 버그 메모는 기존 주석 참고)
-        pick = st.selectbox(
-            "질의 대상", ORD, index=ORD.index(cur),
-            format_func=lambda k: f"{TL.get(k, k)}  ·  {k}",
-            label_visibility="collapsed",
-            width=400,                     # 선택란이 불필요하게 길어지지 않도록 고정 폭
-        )
-        if pick != cur:
-            st.session_state.db_name = pick
-            state.reset_console()
-            st.rerun()
-
+        _band_body(cur)
     with right:
-        with st.container(horizontal=True, horizontal_alignment="right",
-                          vertical_alignment="center", gap="medium"):
-            # 분석가 → 예산 신청 / 관리자 → 예산 관리
-            is_admin = bool(st.session_state.get("is_admin"))
-            rel   = "ui/pages/budget_admin.py" if is_admin else "ui/pages/budget_request.py"
-            label = "📊 예산 관리" if is_admin else "↓ 예산 신청"
-            title = "예산 관리"   if is_admin else "예산 신청"
+        # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
+        st.markdown(design.budget_ring(spent, total, remain),
+                    unsafe_allow_html=True, width="stretch")
 
-            target = st.session_state.get("page_map", {}).get(rel)
-            if st.button(label, key="to_budget", width=150, disabled=target is None):
-                st.session_state.nav_active = title
-                st.switch_page(target)
 
-            # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
-            st.markdown(design.budget_ring(spent, total, remain), unsafe_allow_html=True)
-
+        is_admin = bool(st.session_state.get("is_admin"))
+        rel   = "ui/pages/budget_admin.py" if is_admin else "ui/pages/budget_request.py"
+        label = "📊 예산 관리" if is_admin else "↓ 예산 신청"
+        title = "예산 관리"   if is_admin else "예산 신청"
+        target = st.session_state.get("page_map", {}).get(rel)
+        if st.button(label, key="to_budget", width="stretch", disabled=target is None):
+            st.session_state.nav_active = title
+            st.switch_page(target)
 
 
 def _band_body(cur: str) -> None:
@@ -155,11 +198,13 @@ def _thread(cur: str) -> None:
         _suggestions(cur)
         return
 
-    total = max(st.session_state.get("thread_totals", {}).get(cur, 0), len(full))
-    if total > len(msgs):
+    user = st.session_state.get("username") or "_anon"
+    totals = _totals().get(cur, len(msgs))
+
+    if totals > len(msgs):
         st.html(
             f'<div class="dim" style="font-size:9px;text-align:center;padding:2px 0 6px">'
-            f'이전 {total - len(msgs)}개 질의는 채팅 히스토리에서 볼 수 있습니다 '
+            f'이전 {totals - len(msgs)}개 질의는 채팅 히스토리에서 볼 수 있습니다 '
             f'(화면에는 최근 {len(msgs)}개)</div>'
         )
 
@@ -318,7 +363,7 @@ def _push(q: str, *, code: str | None = None, ans: str = "",
         "fresh": err is None,          # 다음 렌더에서 한 번만 타이핑 효과
     })
     # 표시 상한 — 넘치면 오래된 것부터 버린다 (기록은 query_log 에 남아 있다).
-    totals = st.session_state.setdefault("thread_totals", {})
+    totals = _totals()
     totals[db] = totals.get(db, 0) + 1
     if len(msgs) > MAX_THREAD:
         del msgs[:-MAX_THREAD]

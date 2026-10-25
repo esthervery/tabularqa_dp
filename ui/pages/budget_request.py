@@ -53,12 +53,8 @@ def render() -> None:
                 "질의 대상",
                 f"측정 대상 · {meas['label']} ({meas['col']}) · {_rows(cur):,}행"),
                 unsafe_allow_html=True)
-            pick = st.selectbox("데이터셋", ORD, index=ORD.index(cur),
-                                format_func=lambda k: f"{TL.get(k, k)}  ·  {k}",
-                                key="req_ds", label_visibility="collapsed")
-            if pick != cur:
-                st.session_state.db_name = pick
-                st.rerun()
+            pick = cur   # 데이터셋은 상단 바에서 고른다
+
 
         pol = db.get_effective_policy(user, pick)
         risk = int(pol["risk_level"])

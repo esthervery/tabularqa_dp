@@ -23,13 +23,18 @@ STATUS = {"pending": "대기", "approved": "승인", "partial": "조정", "rejec
 
 def render() -> None:
     design.inject()
+    ds_now = st.session_state.get("adm_ds", "전체")
     st.markdown(design.page_hero(
         "예산 관리",
-        "분석가의 리스크 상향 신청을 검토하고 승인 · 조정 · 거절합니다."),
+        f"분석가의 리스크 상향 신청을 검토하고 승인 · 조정 · 거절합니다 — "
+        f"대상: {'전체 데이터셋' if ds_now == '전체' else ds_now}"),
         unsafe_allow_html=True)
 
+
     admin = st.session_state.get("username") or "admin"
-    s = requests.stats()
+    ds = st.session_state.get("adm_ds", "전체")          # 상단 바에서 고른 값 (기본 '전체')
+    scope = None if ds == "전체" else ds
+    s = requests.stats(db_name=scope)
 
     c = st.columns(4)
     for col, (key, label, tone) in zip(c, [("pending", "대기", "p"), ("approved", "승인", "a"),
@@ -42,10 +47,13 @@ def render() -> None:
                     format_func=lambda k: STATUS.get(k, k) if k != "전체" else "전체",
                     label_visibility="collapsed", key="adm_filter")
 
-    rows = requests.list_all(status=None if filt == "전체" else filt)
+    rows = requests.list_all(status=None if filt == "전체" else filt, db_name=scope)
+
     if not rows:
-        st.markdown(design.empty("해당 상태의 신청이 없습니다"), unsafe_allow_html=True)
+        where = "전체 데이터셋" if scope is None else scope
+        st.markdown(design.empty(f"{where} · 해당 상태의 신청이 없습니다"), unsafe_allow_html=True)
         return
+
 
     pending = [r for r in rows if r["status"] == "pending"]
     if pending:

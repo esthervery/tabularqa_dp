@@ -54,7 +54,7 @@ def _render_login_form() -> None:
         if not user:
             st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
             return
-
+        state.logout()   # 이전 계정의 잔여 세션 상태 제거 (로그아웃을 안 거친 경우 대비)
         st.session_state.authenticated = True
         st.session_state.username      = user["username"]
         st.session_state.is_admin      = bool(user["is_admin"])

@@ -64,8 +64,9 @@ def list_by_user(username: str) -> list[dict]:
 # ── 관리자 API ────────────────────────────────────────────
 
 def list_all(status: Optional[str] = None,
-             user: Optional[str] = None) -> list[dict]:
-    """전체 신청 조회. pending 이 먼저, 그 뒤 최근순."""
+             user: Optional[str] = None,
+             db_name: Optional[str] = None) -> list[dict]:
+    """전체 신청 조회. pending 이 먼저, 그 뒤 최근순. db_name 이 있으면 그 데이터셋만."""
     q = "SELECT * FROM budget_requests WHERE 1=1"
     params: list = []
     if status and status != "전체":
@@ -74,6 +75,9 @@ def list_all(status: Optional[str] = None,
     if user:
         q += " AND username LIKE ?"
         params.append(f"%{user}%")
+    if db_name:
+        q += " AND db_name = ?"
+        params.append(db_name)
     q += " ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, id DESC"
 
     with db.connect() as con:
@@ -133,12 +137,16 @@ def decide(req_id: int, *, reviewer: str, status: str,
     }
 
 
-def stats() -> dict:
-    """상태별 카운트: {'pending':N, 'approved':N, 'partial':N, 'rejected':N}."""
+def stats(db_name: Optional[str] = None) -> dict:
+    """상태별 카운트. db_name 이 있으면 그 데이터셋만 센다."""
+    q = "SELECT status, COUNT(*) c FROM budget_requests"
+    params: list = []
+    if db_name:
+        q += " WHERE db_name = ?"
+        params.append(db_name)
+    q += " GROUP BY status"
     with db.connect() as con:
-        rows = con.execute(
-            "SELECT status, COUNT(*) c FROM budget_requests GROUP BY status"
-        ).fetchall()
+        rows = con.execute(q, params).fetchall()
     out = {"pending": 0, "approved": 0, "partial": 0, "rejected": 0}
     for r in rows:
         out[r["status"]] = int(r["c"])

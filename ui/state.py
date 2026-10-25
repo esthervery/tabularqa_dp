@@ -73,12 +73,13 @@ def init() -> None:
 
 
 def logout() -> None:
-    """세션 상태를 지우고 로그인 전 상태로 되돌린다.
+    """세션 상태를 '전부' 지우고 로그인 전 상태로 되돌린다.
 
-    소모 ε 과 질의 기록은 SQLite(query_log)에 있으므로 세션을 지워도 보존된다.
+    DEFAULTS 목록만 지우면, 이후 페이지에서 새로 만든 키(threads 등)가 살아남아
+    다음 로그인 계정에 이전 계정의 대화가 노출된다 → 화이트리스트 대신 전체 삭제.
+    소모 ε 과 질의 기록은 SQLite(query_log)에 있으므로 지워도 보존된다.
     """
-    for k in DEFAULTS:
-        st.session_state.pop(k, None)
+    st.session_state.clear()
     init()
 
 
