@@ -7,7 +7,7 @@
     밴드 헤더 : 질의 대상(데이터셋) 선택 · 예산 신청 · ε 도넛
     필드 힌트 : 종류만 노출하는 카드 스트립 (건수·비율·최소·최대 없음)
     대화      : 질문 / 생성 코드 / DP 응답
-    입력      : st.chat_input (화면 하단 고정)
+    입력      : 본문 흐름 안의 폼 (하단 고정 오버레이 없음)
 
 질의 1건의 처리 순서는 기획서의 '접근 경로 단일화'를 그대로 따른다.
     guardrail → state.can_spend → agent_bridge → state.record_query
@@ -33,6 +33,18 @@ except Exception:         # noqa: BLE001
 
 ORD = [k for k, v in fields.SPECS.items() if v.get("enabled")]
 TL = {k: fields.SPECS[k]["title"] for k in ORD}
+
+# 대화는 데이터셋별로 분리해 보관한다 (최근 MAX_THREAD 개만).
+# 세션 전역 messages 를 쓰면 데이터셋을 바꿔도 이전 대화가 그대로 남는다.
+MAX_THREAD = 10
+
+
+def _store() -> dict:
+    return st.session_state.setdefault("threads", {})
+
+
+def _msgs(db: str) -> list:
+    return _store().setdefault(db, [])
 
 
 # ── 가드레일 정책 주입 ──────────────────────────────────
@@ -91,10 +103,20 @@ def _band_head(cur: str) -> None:
 
     left, right = st.columns([3.05, 1.35], vertical_alignment="center")
     with left:
+        # key 를 쓰지 않고 index 로만 현재 데이터셋을 표현한다.
+        #
+        # (v17 버그) key="ds_pick" + "불일치하면 세션 값을 cur 로 덮어쓰기" 조합은
+        # 사용자의 선택을 지웠다. 선택 직후 rerun 에서 세션["ds_pick"] 은 새 값,
+        # cur 는 아직 옛 값이라 조건이 참이 되고 → 방금 고른 값이 옛 값으로 덮인 뒤
+        # selectbox 가 그 옛 값을 그렸다. 그래서 Telco 로 계속 되돌아갔다.
+        #
+        # key 없는 selectbox 의 위젯 ID 에는 index 가 포함되므로, index 를 cur 에서
+        # 계산하면 ① 사용자 선택은 그대로 유지되고 ② 다른 화면이 db_name 을 바꾼
+        # 경우에도 위젯이 그 값으로 다시 만들어진다. 양방향 모두 이 한 줄로 해결된다.
         pick = st.selectbox(
             "질의 대상", ORD, index=ORD.index(cur),
             format_func=lambda k: f"{TL.get(k, k)}  ·  {k}",
-            label_visibility="collapsed", key="ds_pick",
+            label_visibility="collapsed",
         )
         if pick != cur:
             st.session_state.db_name = pick
@@ -127,7 +149,8 @@ def _band_body(cur: str) -> None:
 
 
 def _thread(cur: str) -> None:
-    msgs = st.session_state.get("messages") or []
+    full = _msgs(cur)
+    msgs = full[-MAX_THREAD:]          # 표시 상한 (저장은 _push 에서도 자른다)
     if not msgs:
         st.markdown(design.empty("아직 대화가 없습니다 — 아래에 통계량 질의를 입력하세요"),
                     unsafe_allow_html=True)
@@ -135,6 +158,13 @@ def _thread(cur: str) -> None:
         return
 
     blocks: list[str] = []
+    total = max(st.session_state.get("thread_totals", {}).get(cur, 0), len(full))
+    if total > len(msgs):
+        blocks.append(
+            f'<div class="dim" style="font-size:9px;text-align:center;padding:2px 0 6px">'
+            f'이전 {total - len(msgs)}개 질의는 채팅 히스토리에서 볼 수 있습니다 '
+            f'(화면에는 최근 {len(msgs)}개)</div>'
+        )
     for m in msgs:
         blocks.append(design.bubble_user(m.get("q", ""), m.get("meta", "")))
         if m.get("err"):
@@ -168,6 +198,11 @@ def _suggestions(cur: str) -> None:
 
 
 def _composer(cur: str) -> None:
+    """입력줄 — 하단 고정(st.chat_input) 대신 본문 흐름 안의 폼.
+
+    chat_input 은 화면 하단에 떠 있어 아래 대화를 덮었다(겹침의 원인).
+    폼은 본문 흐름에 놓이므로 어떤 요소와도 겹치지 않는다.
+    """
     spec = fields.SPECS.get(cur, {})
     pat = (spec.get("pat") or [{}])[0]
     meas = spec.get("measure", {})
@@ -175,11 +210,22 @@ def _composer(cur: str) -> None:
           f"{meas.get('label', '값')} 중앙값")
 
     q = st.session_state.pop("pending_q", None)
-    typed = st.chat_input(ph)
-    if typed:
-        q = typed
     if q:
         _answer(cur, q)
+
+    st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
+    with st.form("composer", clear_on_submit=True, border=False):
+        c1, c2 = st.columns([1, 0.13], vertical_alignment="bottom")
+        with c1:
+            typed = st.text_input("질의", value="", placeholder=ph,
+                                  label_visibility="collapsed", key="q_input")
+        with c2:
+            sent = st.form_submit_button("질의", type="primary",
+                                         use_container_width=True)
+    if sent:
+        text = (typed or "").strip()
+        if text:
+            _answer(cur, text)
 
 
 # ── 질의 처리 ────────────────────────────────────────────
@@ -251,12 +297,18 @@ def _answer(cur: str, q: str) -> None:
 
 def _push(q: str, *, code: str | None = None, ans: str = "",
           label: str = "결과", err: str | None = None) -> None:
-    msgs = st.session_state.setdefault("messages", [])
+    db = st.session_state.get("db_name")
+    msgs = _msgs(db)
     msgs.append({
         "q": q, "code": code, "ans": ans, "label": label, "err": err,
         "eps": float(st.session_state.get("eps") or EPS) if not err else None,
-        "meta": f"{st.session_state.get('db_name')} · {len(msgs) + 1}번째 질의",
+        "meta": f"{db} · {len(msgs) + 1}번째 질의",
     })
+    # 표시 상한 — 넘치면 오래된 것부터 버린다 (기록은 query_log 에 남아 있다).
+    totals = st.session_state.setdefault("thread_totals", {})
+    totals[db] = totals.get(db, 0) + 1
+    if len(msgs) > MAX_THREAD:
+        del msgs[:-MAX_THREAD]
 
 
 # Streamlit 은 페이지 파일을 '스크립트'로 실행한다 — render() 를 직접 호출해야 한다.
