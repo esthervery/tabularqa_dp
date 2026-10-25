@@ -16,13 +16,14 @@ import streamlit as st
 
 from ui import db, design, fields, requests, state
 
+# 질의당 ε. dp_sim 은 scipy 를 요구하므로, 없어도 화면이 뜨도록 기본값을 먼저 확정한다.
 EPS = 0.1
 try:
+    # dp_sim 은 scipy 가 필요하다 — 없어도 신청 화면은 떠야 한다
     from ui import dp_sim
     EPS = float(dp_sim.EPS_PER_QUERY)
-except Exception:
+except Exception:         # noqa: BLE001
     dp_sim = None
-
 
 ORD = [k for k, v in fields.SPECS.items() if v.get("enabled")]
 TL = {k: fields.SPECS[k]["title"] for k in ORD}
@@ -90,7 +91,7 @@ def render() -> None:
         _history(user)
         return
 
-    lab_l, lab_r = st.columns([1.2, 1.8], vertical_alignment="baseline")
+    lab_l, lab_r = st.columns([1.2, 1.8], vertical_alignment="bottom")
     with lab_l:
         st.markdown('<div style="font-size:10.5px;font-weight:700;color:#101828">'
                     '리스크 상향 요청</div>', unsafe_allow_html=True)
@@ -170,3 +171,7 @@ def _t(v) -> str:
 
 def _esc(s) -> str:
     return str(s).replace("<", "&lt;").replace(">", "&gt;")
+
+
+# Streamlit 은 페이지 파일을 '스크립트'로 실행한다 — render() 를 직접 호출해야 한다.
+render()

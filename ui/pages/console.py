@@ -20,14 +20,16 @@ import os
 import streamlit as st
 
 from ui import agent_bridge as ab
-from ui import catalog, db, design, fields, guardrail, hints, state
+from ui import db, design, fields, guardrail, hints, state
 
-try:                      # dp_sim 은 scipy 가 필요하다 — 없어도 콘솔은 떠야 한다
+# 질의당 ε. dp_sim 은 scipy 를 요구하므로, 없어도 화면이 뜨도록 기본값을 먼저 확정한다.
+EPS = 0.1
+try:
+    # dp_sim 은 scipy 가 필요하다 — 없어도 콘솔은 떠야 한다
     from ui import dp_sim
-    EPS = float(EPS)
+    EPS = float(dp_sim.EPS_PER_QUERY)
 except Exception:         # noqa: BLE001
     dp_sim = None
-    EPS = 0.1
 
 ORD = [k for k, v in fields.SPECS.items() if v.get("enabled")]
 TL = {k: fields.SPECS[k]["title"] for k in ORD}
@@ -255,3 +257,7 @@ def _push(q: str, *, code: str | None = None, ans: str = "",
         "eps": float(st.session_state.get("eps") or EPS) if not err else None,
         "meta": f"{st.session_state.get('db_name')} · {len(msgs) + 1}번째 질의",
     })
+
+
+# Streamlit 은 페이지 파일을 '스크립트'로 실행한다 — render() 를 직접 호출해야 한다.
+render()

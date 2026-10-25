@@ -265,7 +265,6 @@ def field_card(f: dict) -> str:
 
     if kind == "filter":
         q = f.get("quartiles") or [None, None, None]
-        unit = f.get("unit") or ""
         ticks = "".join('<i style="left:%d%%"></i>' % p for p in (0, 50, 100))
         cells = "".join(
             f'<span>{n} <b>{_num(v)}</b></span>'

@@ -179,3 +179,7 @@ def _t(v) -> str:
 
 def _esc(s) -> str:
     return str(s).replace("<", "&lt;").replace(">", "&gt;")
+
+
+# Streamlit 은 페이지 파일을 '스크립트'로 실행한다 — render() 를 직접 호출해야 한다.
+render()
