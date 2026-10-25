@@ -126,8 +126,18 @@ def _band_head(cur: str) -> None:
     with right:
         b, d = st.columns([1.05, 1], vertical_alignment="center")
         with b:
-            if st.button("↓ 예산 신청", key="to_budget", use_container_width=True):
-                st.switch_page("ui/pages/budget_request.py")
+            # 분석가 → 예산 신청 / 관리자 → 예산 관리
+            # (관리자에게는 budget_request 페이지가 등록되어 있지 않다)
+            is_admin = bool(st.session_state.get("is_admin"))
+            rel   = "ui/pages/budget_admin.py" if is_admin else "ui/pages/budget_request.py"
+            label = "📊 예산 관리" if is_admin else "↓ 예산 신청"
+            title = "예산 관리"   if is_admin else "예산 신청"
+
+            target = st.session_state.get("page_map", {}).get(rel)
+            if st.button(label, key="to_budget", use_container_width=True,
+                         disabled=target is None):
+                st.session_state.nav_active = title   # 상단 탭 강조도 함께 이동
+                st.switch_page(target)
         with d:
             st.markdown(
                 design.donut(spent / total if total else 0.0,

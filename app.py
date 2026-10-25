@@ -104,6 +104,22 @@ if st.session_state.get("nav_active") not in TITLES:
     st.session_state.nav_active = TITLES[0]
 
 pg = st.navigation(PAGES, position="hidden")
+
+
+# 다른 페이지에서 switch_page 할 때 쓰도록, 이번 실행에 등록된 페이지 객체를
+# '파일 경로 → Page' 로 저장한다. (역할에 따라 등록된 페이지가 다르므로
+# 페이지 쪽에서는 이 맵에 있는지 먼저 확인하고 이동한다)
+st.session_state.page_map = {
+    rel: p for rel, p in (
+        ("ui/pages/console.py", console),
+        ("ui/pages/history.py", history),
+        ("ui/pages/budget_request.py",   next((x for x in FLAT if getattr(x, "title", "") == "예산 신청"), None)),
+        ("ui/pages/budget_admin.py",     next((x for x in FLAT if getattr(x, "title", "") == "예산 관리"), None)),
+        ("ui/pages/privacy_analysis.py", next((x for x in FLAT if getattr(x, "title", "") == "프라이버시 분석"), None)),
+    ) if p is not None
+}
+
+
 design.inject()
 
 
