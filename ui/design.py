@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import math
 import re
+import html as _h
 
 import streamlit as st
 
@@ -352,6 +353,37 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .res .rk{font-size:12px;color:var(--suc2);font-weight:600}
 .res .rn{font-family:var(--mono);font-size:20px;font-weight:600;color:var(--ink)}
 .res .rt{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--suc2)}
+
+/* ── 에이전트 응답 카드 (콘솔) — 단계 줄 / 코드(어두운 배경) / 결과(밝은 배경) ── */
+.agcard{border:1px solid var(--bd);border-radius:12px;background:#fff;overflow:hidden;
+  box-shadow:var(--shadow)}
+.steps{display:flex;flex-wrap:wrap;gap:18px;padding:9px 16px;
+  border-bottom:1px solid var(--bd2);background:var(--wash)}
+.steps span{font-size:11.5px;color:var(--dim);font-weight:500}
+.steps span.on{color:var(--suc2);font-weight:600}
+.steps span.now{color:var(--pri2);font-weight:600}
+.codeblk{background:#0f172a;padding:12px 0;font-family:var(--mono);font-size:12.5px;
+  line-height:1.75;overflow-x:auto}
+.codeblk .cl{display:flex;min-width:max-content}
+.codeblk .ln{flex:0 0 40px;padding-right:14px;text-align:right;color:#475569;user-select:none}
+.codeblk .cc{white-space:pre;color:#e2e8f0;padding-right:18px}
+.codeblk .cm{color:#64748b;font-style:italic}
+.codeblk .kw{color:#c4b5fd}
+.codeblk .str{color:#86efac}
+.codeblk .nu{color:#fcd34d}
+.codeblk .caret{display:inline-block;width:7px;height:1.05em;margin-left:1px;
+  vertical-align:-2px;background:#a5b4fc;animation:dpblink 1s steps(1) infinite}
+.codeblk.pend{padding:14px 18px;color:#94a3b8;font-size:12px}
+@keyframes dpblink{50%{opacity:0}}
+.ares{padding:14px 18px 16px}
+.ares .rk{font-size:12px;color:var(--mid);font-weight:600}
+.ares .rrow{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:4px}
+.ares .rv{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--ink);
+  letter-spacing:-.02em;line-height:1.15;word-break:break-all}
+.ares .rv.multi{font-size:14px;font-weight:500;white-space:pre-wrap;line-height:1.6}
+.epsb{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--pri2);
+  background:var(--prisoft);border:1px solid var(--priline);border-radius:7px;
+  padding:3px 9px;white-space:nowrap}
 .warn{border:1px solid var(--danline);background:var(--dansoft);color:var(--dan2);
   border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6}
 .hintline{border:1px solid var(--wrnline);background:var(--wrnsoft);color:var(--wrn2);
@@ -669,3 +701,101 @@ def _hl(code: str) -> str:
             buf.append(f'<span class="kw">{_esc(p)}</span>' if p in _KEYWORDS else _esc(p))
         out.append("".join(buf))
     return "\n".join(out)
+
+
+# ── 에이전트 응답 카드 (콘솔 전용) ─────────────────────────
+# st.html 로 렌더링한다 (st.markdown 은 빈 줄에서 HTML 블록이 끊겨 태그가 노출됨).
+
+STEPS = ("① 스키마로 프롬프트 구성", "② 선택한 데이터에 대해 실행", "③ 노이즈 주입 후 반환")
+
+_TOK = re.compile(
+    r"(?P<cm>#.*$)"
+    r"|(?P<str>'[^'\n]*'|\"[^\"\n]*\")"
+    r"|(?P<kw>\b(?:def|return|import|from|as|if|elif|else|for|in|while|and|or|not|is|"
+    r"None|True|False|lambda|with|try|except)\b)"
+    r"|(?P<nu>\b\d+(?:\.\d+)?\b)"
+)
+
+
+def _hl(line: str) -> str:
+    """한 줄을 escape + 간단한 하이라이트."""
+    out, pos = [], 0
+    for m in _TOK.finditer(line):
+        out.append(_h.escape(line[pos:m.start()]))
+        out.append(f'<span class="{m.lastgroup}">{_h.escape(m.group())}</span>')
+        pos = m.end()
+    out.append(_h.escape(line[pos:]))
+    return "".join(out)
+
+
+def code_block(code: str | None, *, caret: bool = False) -> str:
+    """어두운 배경 + 라인 번호 코드 블록. caret=True 면 마지막 줄 끝에 깜빡이는 커서."""
+    text = code or ""
+    if not caret:
+        text = text.rstrip("\n")
+    lines = text.split("\n")
+    rows = []
+    for i, ln in enumerate(lines):
+        body = _hl(ln)
+        if caret and i == len(lines) - 1:
+            body += '<span class="caret"></span>'
+        rows.append(f'<div class="cl"><span class="ln">{i + 1}</span>'
+                    f'<span class="cc">{body or "&#8203;"}</span></div>')
+    return '<div class="codeblk">' + "".join(rows) + "</div>"
+
+
+def _fmt_num(v: float) -> str:
+    s = f"{v:,.5f}".rstrip("0").rstrip(".")
+    return "0" if s in ("", "-0") else s
+
+
+_FLOAT = re.compile(r"-?\d+\.\d+(?:[eE][-+]?\d+)?")
+
+
+def fmt_answer(ans) -> str:
+    """응답값 표시용 — 소수점 최대 5자리 (끝자리 0 제거, 천 단위 콤마).
+    스칼라가 아니면(Series 출력 등) 문자열 속 실수만 골라 같은 규칙으로 바꾼다."""
+    s = str(ans).strip()
+    try:
+        return _fmt_num(float(s))
+    except ValueError:
+        return _FLOAT.sub(lambda m: _fmt_num(float(m.group())), s)
+
+
+def steps(done: int) -> str:
+    """done = 완료된 단계 수 (0~3). 완료=on(초록), 진행 중=now(indigo)."""
+    parts = []
+    for i, t in enumerate(STEPS):
+        cls = "on" if i < done else ("now" if i == done else "")
+        parts.append(f'<span class="{cls}">{t}</span>')
+    return '<div class="steps">' + "".join(parts) + "</div>"
+
+
+def _agent_wrap(inner: str) -> str:
+    return ('<div class="msg a"><div class="av">ε</div><div class="bub">'
+            f'<div class="agcard">{inner}</div></div></div>')
+
+
+def agent_card(code: str | None, ans=None, *, label: str = "결과",
+               eps: float | None = None, typing: bool = False) -> str:
+    """단계 줄 + 코드 블록 + (타이핑이 끝나면) 결과 영역."""
+    body = steps(1 if typing else 3) + code_block(code, caret=typing)
+    if not typing and ans not in (None, ""):
+        v = fmt_answer(ans)
+        multi = " multi" if "\n" in v else ""
+        badge = (f'<span class="epsb">ε {float(eps):.2f} 소모</span>'
+                 if eps is not None else "")
+        body += (f'<div class="ares"><div class="rk">{_h.escape(str(label))}</div>'
+                 f'<div class="rrow"><div class="rv{multi}">{_h.escape(v)}</div>{badge}</div></div>')
+    return _agent_wrap(body)
+
+
+def agent_pending() -> str:
+    """API 응답을 기다리는 동안의 카드."""
+    return _agent_wrap(steps(0) + '<div class="codeblk pend">에이전트가 코드를 작성하고 있습니다'
+                       '<span class="caret"></span></div>')
+
+
+def agent_error(msg: str) -> str:
+    """오류/차단 메시지 말풍선."""
+    return f'<div class="msg a"><div class="av">ε</div><div class="bub">{warn(msg)}</div></div>'

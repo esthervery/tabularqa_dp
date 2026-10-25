@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 import streamlit as st
 
@@ -37,6 +38,8 @@ TL = {k: fields.SPECS[k]["title"] for k in ORD}
 # 대화는 데이터셋별로 분리해 보관한다 (최근 MAX_THREAD 개만).
 # 세션 전역 messages 를 쓰면 데이터셋을 바꿔도 이전 대화가 그대로 남는다.
 MAX_THREAD = 10
+# 타이핑 효과 총 재생 시간(초) — 코드 길이와 무관하게 이 시간 안에 끝난다.
+TYPE_SECONDS = 1.7
 
 
 def _store() -> dict:
@@ -167,24 +170,38 @@ def _thread(cur: str) -> None:
         _suggestions(cur)
         return
 
-    blocks: list[str] = []
     total = max(st.session_state.get("thread_totals", {}).get(cur, 0), len(full))
     if total > len(msgs):
-        blocks.append(
+        st.html(
             f'<div class="dim" style="font-size:9px;text-align:center;padding:2px 0 6px">'
             f'이전 {total - len(msgs)}개 질의는 채팅 히스토리에서 볼 수 있습니다 '
             f'(화면에는 최근 {len(msgs)}개)</div>'
         )
+
+    # 말풍선마다 st.html 로 따로 그린다 (st.markdown + 빈 줄 → 태그 노출 버그 방지)
     for m in msgs:
-        blocks.append(design.bubble_user(m.get("q", ""), m.get("meta", "")))
+        st.html(design.bubble_user(m.get("q", ""), m.get("meta", "")))
         if m.get("err"):
-            blocks.append('<div class="msg a"><div class="av">D</div><div class="bub">'
-                          + design.warn(m["err"]) + "</div></div>")
+            st.html(design.agent_error(m["err"]))
+        elif m.pop("fresh", False):          # 방금 받은 응답 — 한 번만 타이핑 재생
+            _type_out(m)
         else:
-            blocks.append(design.bubble_agent(
-                m.get("code"), m.get("ans", ""),
-                label=m.get("label", "결과"), eps=m.get("eps")))
-    st.markdown('<div class="thread">' + "".join(blocks) + "</div>", unsafe_allow_html=True)
+            st.html(design.agent_card(m.get("code"), m.get("ans", ""),
+                                      label=m.get("label", "결과"), eps=m.get("eps")))
+
+
+def _type_out(m: dict) -> None:
+    """코드를 한 글자씩 써 내려간 뒤 결과 영역을 붙인다."""
+    code = m.get("code") or ""
+    kw = {"label": m.get("label", "결과"), "eps": m.get("eps")}
+    box = st.empty()
+    frames = max(1, min(90, len(code)))
+    step = max(1, -(-len(code) // frames))   # 올림 나눗셈
+    delay = TYPE_SECONDS / frames
+    for i in range(step, len(code), step):
+        box.html(design.agent_card(code[:i], typing=True, **kw))
+        time.sleep(delay)
+    box.html(design.agent_card(code, m.get("ans", ""), **kw))
 
 
 def _suggestions(cur: str) -> None:
@@ -274,10 +291,10 @@ def _answer(cur: str, q: str) -> None:
     box = st.empty()
     acc = ""
     try:
+        # 응답을 기다리는 동안엔 '작성 중' 카드만 보여주고, 실제 타이핑은 리런 후 _thread 에서 재생
+        box.html(design.bubble_user(q) + design.agent_pending())
         for chunk in ab.stream_code(q, cur):
             acc += chunk
-            box.markdown('<div class="thread">' + design.bubble_user(q) +
-                         design.bubble_agent(acc, "") + "</div>", unsafe_allow_html=True)
 
         trace = st.session_state.get("_last_trace") or {}
         code = trace.get("code") or acc
@@ -313,6 +330,7 @@ def _push(q: str, *, code: str | None = None, ans: str = "",
         "q": q, "code": code, "ans": ans, "label": label, "err": err,
         "eps": float(st.session_state.get("eps") or EPS) if not err else None,
         "meta": f"{db} · {len(msgs) + 1}번째 질의",
+        "fresh": err is None,          # 다음 렌더에서 한 번만 타이핑 효과
     })
     # 표시 상한 — 넘치면 오래된 것부터 버린다 (기록은 query_log 에 남아 있다).
     totals = st.session_state.setdefault("thread_totals", {})
