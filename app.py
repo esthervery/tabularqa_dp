@@ -137,12 +137,11 @@ with top[1]:
     bar = st.container(horizontal=True, horizontal_alignment="right",
                        vertical_alignment="center", gap="small")
     with bar:
-        for pg_item in FLAT:
+        for i, pg_item in enumerate(FLAT):
             t = getattr(pg_item, "title", "")
-            ic = getattr(pg_item, "icon", "") or ""
             on = st.session_state.nav_active == t
-            if st.button(f"{ic}  {t}", key=f"nav_{t}",
-                         type=("primary" if on else "secondary")):
+            if st.button(t, key=f"nav_{i}",
+                         type=("primary" if on else "tertiary")):
                 st.session_state.nav_active = t
                 st.switch_page(pg_item)
 
@@ -154,7 +153,7 @@ with top[1]:
             '<div class="u"><b>' + USER + "</b><span>" + ROLE_LABEL + "</span></div></div>",
             unsafe_allow_html=True,
         )
-        if st.button("로그아웃", key="nav_logout"):
+        if st.button("로그아웃", key="nav_logout", type="tertiary"):
             state.logout()
             boot.discard()
             st.rerun()

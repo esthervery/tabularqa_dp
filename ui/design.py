@@ -102,26 +102,39 @@ h3{font-size:1rem !important}   h4{font-size:.9rem !important}
 .navbrand .who b{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
 .navbrand .who span{font-size:10.5px;letter-spacing:.04em;color:var(--mid);margin-top:2px}
 
-/* 탭 — 테두리 없는 텍스트 탭, 선택 항목만 Indigo soft 배경 */
-[class*="st-key-nav_"] button{
+/* 탭 — 레퍼런스처럼 테두리 없는 텍스트 링크. 선택 항목은 진한 글자 + indigo 밑줄.
+   .stApp 를 앞에 붙여 아래 '버튼' 공통 규칙보다 우선순위를 높인다. */
+.stApp [class*="st-key-nav_"] button{
   border:none !important; background:transparent !important;
-  color:var(--mid) !important; font-size:13.5px !important; font-weight:500 !important;
-  padding:8px 12px !important; min-height:0 !important; height:auto !important;
-  box-shadow:none !important; border-radius:8px !important;
+  box-shadow:none !important; border-radius:0 !important;
+  color:var(--mid) !important; font-size:14px !important; font-weight:500 !important;
+  padding:6px 2px !important; margin:0 8px !important;
+  min-height:0 !important; height:auto !important;
   letter-spacing:-.012em; white-space:nowrap;
+  transition:color .15s, box-shadow .15s;
 }
-[class*="st-key-nav_"] button:hover{
-  background:var(--wash) !important; color:var(--pri2) !important;
+/* 라벨 <p> 가 전역 p 색상을 받지 않고 버튼 색을 따르도록 */
+.stApp [class*="st-key-nav_"] button p{
+  color:inherit !important; font-size:inherit !important;
+  font-weight:inherit !important; margin:0 !important;
 }
-[class*="st-key-nav_"] button[kind="primary"]{
-  background:var(--prisoft) !important; color:var(--pri2) !important;
-  font-weight:700 !important; box-shadow:none !important;
+.stApp [class*="st-key-nav_"] button:hover,
+.stApp [class*="st-key-nav_"] button:focus,
+.stApp [class*="st-key-nav_"] button:active{
+  background:transparent !important; color:var(--ink) !important; box-shadow:none !important;
 }
-[class*="st-key-nav_logout"] button{
-  color:var(--dim) !important; font-size:12.5px !important; background:transparent !important;
+/* 현재 페이지 */
+.stApp [class*="st-key-nav_"] button[kind="primary"],
+.stApp [class*="st-key-nav_"] button[kind="primary"]:hover{
+  background:transparent !important; color:var(--ink) !important; font-weight:700 !important;
+  box-shadow:inset 0 -2px 0 var(--pri) !important;
 }
-[class*="st-key-nav_logout"] button:hover{
-  background:var(--dansoft) !important; color:var(--dan2) !important;
+/* 로그아웃 — 더 옅은 텍스트, hover 시 rose */
+.stApp .st-key-nav_logout button{
+  color:var(--dim) !important; font-size:13px !important; margin:0 0 0 4px !important;
+}
+.stApp .st-key-nav_logout button:hover{
+  color:var(--dan2) !important; background:transparent !important;
 }
 
 /* 계정 (우측) */
