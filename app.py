@@ -1,48 +1,44 @@
-"""Streamlit 데모 진입점.
+"""Streamlit 데모 진입점 (v14 시안 기준).
 
-역할별 페이지 라우팅과 사이드바 하단 고정 블록만 담당한다.
+역할별 페이지 라우팅과 사이드바 하단 블록만 담당한다.
 각 페이지는 ui/pages/*.py 에서 독립적으로 렌더링을 결정한다.
 
-Renders (위→아래):
-  - 로그인 안 된 상태: 사이드바 완전히 숨기고 auth.render_login() 만 보여줌
-  - 로그인 후:
-      · 사이드바 상단 : 각 페이지가 채우는 컨텍스트 슬롯 (nav_slot)
-      · 사이드바 하단 : 역할 표시 + Log out 버튼 (고정)
-      · 메인          : st.navigation 이 선택한 페이지의 body
+    분석가 : 질의 콘솔 / 채팅 히스토리 / 예산 신청
+    관리자 : 질의 콘솔 / 채팅 히스토리 / 예산 관리 / 프라이버시 분석
+
+역할은 로그인 계정이 결정한다(users.is_admin). 화면에 역할 토글은 두지 않는다.
 """
 import streamlit as st
-from ui import auth, boot, db, state
-
+from ui import auth, boot, db, fields, state
 
 # 스키마 준비 + 세션 상태 확인. set_page_config 는 첫 Streamlit 호출이므로
 # 세션 값을 먼저 읽고 그다음에 호출한다.
-# 기본값 init(True), 데모 계정 생성
 db.init()
 authed = st.session_state.get("authenticated", False)
 
 st.set_page_config(
-    page_title="DP Agent · Workspace",
+    page_title="DPilot · Workspace",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded" if authed else "collapsed",
 )
 
-# 세션 상태 초기화(디폴트 설정)
 state.init()
 
-# [0928] 파이프라인 워밍업: 로그인 화면을 띄우는 동안 백그라운드로 로딩한다.
-# 로그인 전 st.stop() 보다 먼저 호출해야 로그인 화면 시점부터 로딩이 시작된다.
-# (페이지 파일은 pg.run() 시점에 실행되므로, 여기서 안 걸면 첫 질의에서야 로딩이 시작된다.)
-# boot 모듈 안의 _started 가드 덕분에 리런마다 호출해도 기동은 1회뿐이다.
+# 파이프라인 워밍업 — 로그인 화면을 띄우는 동안 백그라운드로 로딩한다.
 boot.start()
 
+# 데모 데이터셋 카탈로그 (state.DEFAULTS 의 db_name 은 구버전 값이다)
+ENABLED = [k for k, v in fields.SPECS.items() if v.get("enabled")]
+if st.session_state.get("db_name") not in ENABLED:
+    st.session_state.db_name = ENABLED[0]
 
-# ===로그인 전(authed 디폴트는 False): 사이드바를 아예 숨김===
+
+# ===로그인 전: 사이드바를 아예 숨김===
 if not authed:
     st.markdown(
         """
         <style>
-        /* 로그인 화면에서만 사이드바와 토글 버튼을 완전히 숨김 */
         [data-testid="stSidebar"],
         [data-testid="stSidebarCollapsedControl"],
         [data-testid="collapsedControl"] { display: none !important; }
@@ -54,70 +50,55 @@ if not authed:
     auth.render_login()
     st.stop()
 
-# ===로그인 후(authed = True)===
-# 개인 상한을 반영한 정책 정보 로딩
-# state.apply_active_policy()
+# ===로그인 후===
 state.apply_effective_policy()
 
 IS_ADMIN = bool(st.session_state.get("is_admin"))
 
-
 # ── 페이지 구성 ───────────────────────────────────────────
-# 분석가: Console + Budget Requests
-# 관리자: Console + Privacy(정책 실험/확정) + Audit(예산 결재)
-agent_qa = st.Page(
-    "ui/pages/agent_qa.py",
-    title="DP Agent Console",
-    # icon=":material/chat:",
-    icon="💻",
-    default=True,
-)
+console = st.Page("ui/pages/console.py", title="질의 콘솔", icon="💻", default=True)
+history = st.Page("ui/pages/history.py", title="채팅 히스토리", icon="🕘")
 
 if IS_ADMIN:
     pages: dict[str, list] = {
-        "Workspace": [agent_qa],
+        "Workspace": [console, history],
         "Admin": [
-            st.Page("ui/pages/privacy.py",
-                    title="Privacy Policy",
-                    # icon=":material/shield:"),
-                    icon="🎚️"),
-            st.Page("ui/pages/audit.py",
-                    title="Audit · 예산 결재",
-                    # icon=":material/receipt_long:"),
-                    icon="📜"),
+            st.Page("ui/pages/budget_admin.py", title="예산 관리", icon="📊"),
+            st.Page("ui/pages/privacy.py", title="프라이버시 분석", icon="🎚️"),
         ],
     }
 else:
     pages = {
         "Workspace": [
-            agent_qa,
-            st.Page("ui/pages/budget_requests.py",
-                    title="Budget Requests",
-                    # icon=":material/request_quote:"),
-                    icon="📝"),
+            console, history,
+            st.Page("ui/pages/budget_request.py", title="예산 신청", icon="📝"),
         ],
     }
 
 pg = st.navigation(pages)
 
 
-# ── 사이드바: 페이지 컨텍스트 슬롯 + 하단 고정 블록 ──────
+# ── 사이드바: 하단 고정 블록 ──────────────────────────────
 with st.sidebar:
-    # 각 페이지가 이 컨테이너에 DB/필터 등을 채운다.
-    st.session_state.nav_slot = st.container()
-
-    # 사이드바 최하단 (역할 표시 + 로그아웃)
     with st.container(key="sidebar_bottom"):
-        # st.divider()
-        role_label = "관리자" if IS_ADMIN else "분석가"
-        st.write(f"**{role_label}** · {st.session_state.username}")
-            # Ex) 관리자 · admin
-        if st.button("Log out", width='stretch'):
+        role_label = "Admin" if IS_ADMIN else "Analyst"
+        st.markdown(
+            '<div style="display:flex;align-items:center;gap:7px;padding:10px 0 8px;'
+            'border-top:1px solid #e4e8ee;margin-top:10px">'
+            '<div style="width:20px;height:20px;border-radius:5px;background:#eef0fe;'
+            'border:1px solid #cdd2fb;color:#3f42b8;display:flex;align-items:center;'
+            'justify-content:center;font-family:IBM Plex Mono,monospace;font-size:8px;'
+            'font-weight:600">'
+            f'{role_label[:2].upper()}</div>'
+            '<div style="display:flex;flex-direction:column;line-height:1.25">'
+            f'<b style="font-size:10.5px;color:#101828">{st.session_state.username}</b>'
+            f'<span style="font-family:IBM Plex Mono,monospace;font-size:7.5px;'
+            f'color:#8896a8">{role_label}</span></div></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("→ 로그아웃", use_container_width=True):
             state.logout()
-            # [0928] 로그인마다 새 파이프라인이 되도록 폐기한다.
-            # st.rerun() 보다 먼저 호출해야 한다 — 뒤에 두면 이미 리런이 시작돼 반영되지 않는다.
-            # 폐기 후 다음 리런의 boot.start() 가 _started=False 를 보고 재기동하므로
-            # 별도로 재기동을 호출할 필요가 없다(로그아웃 즉시 다시 로딩이 시작된다).
+            # 로그인마다 새 파이프라인이 되도록 폐기한다 (rerun 보다 먼저).
             boot.discard()
             st.rerun()
 

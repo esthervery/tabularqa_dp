@@ -1,258 +1,181 @@
-### 0919 수정
-"""Privacy Policy — 관리자용 DB별 리스크 정책 콘솔.
+"""프라이버시 분석 (관리자) — 리스크 레벨별 신뢰구간 수렴.
 
-Renders (위→아래):
-  [사이드바 슬롯 : 비워둠]
+화면: 관리자가 데이터셋 × 리스크 레벨의 DP 보장 수준을 비교하고,
+      데이터셋별 기본 정책을 [확정] 하는 곳.
 
-  [메인]
-    1) 헤더 : "Privacy Policy" + 부제
-    2) Policy scope : 편집 대상 DB selectbox
-    3) Currently applied : 이 DB 의 현재 확정 정책 요약 (Risk N + 총 ε + k)
-    4) Risk 버튼 5개 (Risk 1..5) → 클릭 시 미리보기 모달 open
-    5) Matrix (expander) : 모든 DB 의 현재 정책 요약
-    6) History : 확정 이력 dataframe
+계산은 ui/dp_sim.py 의 simulate() 를 그대로 쓴다 (라플라스 노이즈 시뮬레이션).
+값 노출 규칙 — 이 화면에도 원본 값은 올리지 않는다.
+    표시  : 리스크별 최종 95% CI 폭, 필요 라운드 수 k, 민감도 Δ
+    금지  : 참 평균·최소·최대·개별 응답 (원본 통계 노출 경로가 된다)
 
-  [모달] (관리자가 Risk N 버튼을 눌렀을 때)
-    · 시각화 A/B 자리 (지금은 스텁)
-    · 해설 자리 (지금은 스텁)
-    · [✓ 확정] · [✕ 취소]
-    · 확정 시 db.confirm_policy() 호출 후 모달 닫고 rerun.
+SIM_TARGET 주의
+    dp_sim.SIM_TARGET 에는 원래 000_CardBase/047_Bank 만 등록돼 있다.
+    데모 4종을 쓰기 위해 이 페이지에서 스펙의 측정 대상 컬럼으로 채워 넣는다.
+    (ui/dp_sim.py 를 고치지 않아도 되고, 스펙과 어긋나지 않는다.)
 """
-import pandas as pd
+from __future__ import annotations
+
 import streamlit as st
 
-from ui import agent_bridge as ab, db, state, theme
-from ui import dp_sim, dp_viz
+from ui import db, design, fields
+
+try:
+    from ui import dp_sim
+    _SIM_ERR = None
+except Exception as _e:   # scipy 미설치 등 — 화면은 뜨고 안내만 남긴다
+    dp_sim = None
+    _SIM_ERR = f"{type(_e).__name__}: {_e}"
+
+RISKS = [1, 2, 3, 4, 5]
 
 
-theme.inject_global_css()
-
-if not st.session_state.get("is_admin"):
-    st.error("이 페이지는 관리자 권한이 필요합니다.")
-    st.stop()
-
-
-ME = st.session_state.username
+def _ensure_targets() -> None:
+    for name, spec in fields.SPECS.items():
+        if spec.get("enabled"):
+            dp_sim.SIM_TARGET.setdefault(name, spec["measure"]["col"])
 
 
-# ── 사이드바 : 이 페이지는 사이드바에 아무것도 두지 않는다 ──
+def render() -> None:
+    design.inject()
+    if dp_sim is None:
+        st.markdown(design.topbar("프라이버시 분석", "Admin"), unsafe_allow_html=True)
+        st.markdown(design.warn("시뮬레이터를 불러오지 못했습니다 — scipy 설치가 필요합니다 "
+                                f"({_SIM_ERR})"), unsafe_allow_html=True)
+        return
+    _ensure_targets()
+    st.markdown(design.topbar("프라이버시 분석", "Admin"), unsafe_allow_html=True)
+    st.markdown(design.page_head(
+        "프라이버시 분석",
+        "리스크 레벨별 95% 신뢰구간 폭 — 낮을수록 프라이버시가 강하고 결과가 거칠다"),
+        unsafe_allow_html=True)
 
+    rows = []
+    errors = []
+    for name, spec in fields.SPECS.items():
+        if not spec.get("enabled"):
+            continue
+        widths, k = {}, None
+        for r in RISKS:
+            try:
+                res = dp_sim.simulate(name, r)
+                widths[r] = float(res.stop_ci_hi - res.stop_ci_lo)
+                k = int(res.k)
+            except Exception as e:
+                errors.append(f"{name} · Risk {r}: {type(e).__name__}: {e}")
+        if widths:
+            rows.append({"name": name, "title": spec["title"], "widths": widths,
+                         "k": k, "measure": spec["measure"]})
 
-# ── 헤더 ────────────────────────────────────────────
-st.title("Privacy Policy")
-# st.caption(
-#     "DB별로 리스크 레벨을 선택하면 총 ε 예산과 라운드 수(k)가 자동으로 결정됩니다. "
-#     "리스크 버튼을 눌러 미리보기 그래프에서 신뢰구간 수렴과 인접 DB CI 겹침을 확인한 뒤 확정하세요."
-# )
+    if errors:
+        st.markdown(design.warn("일부 시뮬레이션을 계산하지 못했습니다 — " + "; ".join(errors[:3])),
+                    unsafe_allow_html=True)
 
-
-# ── Policy scope · 편집 대상 DB ─────────────────────
-with st.container(border=True):
-    st.subheader("데이터베이스 선택")
-    sel_l, sel_r = st.columns([1, 2])
-    with sel_l:
-        dom = st.selectbox(
-            "도메인", ab.catalog.domains(), key="db_domain",
-        )
-    with sel_r:
-        choices = ab.catalog.names(dom)
-        if not choices:
-            st.error("`competition/` 에서 `all.parquet` 을 찾지 못했습니다.")
-            st.stop()
-        if st.session_state.db_name not in choices:
-            st.session_state.db_name = choices[0]
-        st.selectbox(
-            "Database", choices, key="db_name",
-            format_func=lambda n: f"{n} · {ab.catalog.meta(n)['title'][:40]}",
-        )
-
-    if dp_sim.is_supported(st.session_state.db_name):
-        st.caption(
-            f"시뮬레이션 대상 컬럼 : "
-            f"`{dp_sim.target_of(st.session_state.db_name)}`"
-        )
-    else:
-        st.warning(
-            f"`{st.session_state.db_name}` 는 아직 시뮬레이션 대상 컬럼이 "
-            f"등록되어 있지 않습니다. `ui/dp_sim.py` 의 `SIM_TARGET` 에 추가하세요.",
-            icon="⚠️",
-        )
-
-
-DBNAME = st.session_state.db_name
-ACTIVE = db.get_active_policy(DBNAME)
-
-
-# ── Risk 버튼 5개 ──────────────────────────────
-with st.container(border=True):
-    st.subheader("리스크 레벨 선택")
-
-    btn_cols = st.columns(5)
-    for lvl in (1, 2, 3, 4, 5):
-        eps = db.RISK_TO_EPSILON[lvl]
-        is_current = (lvl == int(ACTIVE["risk_level"]))
-        label = f"Risk {lvl}\n(ε={eps:.0f})"
-        if btn_cols[lvl - 1].button(
-            label,
-            key=f"risk_btn_{lvl}",
-            type=("primary" if is_current else "secondary"),
-            width='stretch',
-        ):
-            st.session_state.policy_modal_open  = True
-            st.session_state.policy_modal_level = lvl
-            st.rerun()
-
-
-# ── Currently applied ────────────────────────────
-with st.container(border=True):
-    is_default = ACTIVE.get("confirmed_at") is None
-    if is_default:
-        st.subheader("활성 프라이버시 정책")
-        st.caption(
-            f"`{DBNAME}` 에 확정된 정책이 없어 시스템 기본값 (Risk 1) 이 적용됩니다."
-        )
-    else:
-        st.subheader(f"현재 정책 · `{DBNAME}`")
-        st.caption(
-            f"확정 · {ACTIVE['confirmed_at'].replace('T', ' ')}"
-            f" · by {ACTIVE.get('admin') or 'system'}"
-        )
-
-    a1, a2, a3 = st.columns(3)
-    a1.metric("리스크 레벨", f"Risk {ACTIVE['risk_level']}")
-    a2.metric("총 ε 예산",   f"{ACTIVE['total_epsilon']:.1f}")
-    a3.metric("라운드 수 k", f"{int(ACTIVE['total_epsilon'] / dp_sim.EPS_PER_QUERY)}")
-
-
-# ── 모달 (dialog) ──────────────────────────────
-
-@st.dialog("Risk 정책 테스트", width="large")
-def _risk_preview_dialog():
-    lvl = st.session_state.policy_modal_level
-    if lvl is None:
-        st.warning("레벨이 지정되지 않았습니다.")
+    if not rows:
+        st.markdown(design.empty("시뮬레이션할 데이터셋이 없습니다"), unsafe_allow_html=True)
         return
 
-    eps = db.RISK_TO_EPSILON[lvl]
-    k   = int(eps / dp_sim.EPS_PER_QUERY)
+    _matrix(rows)
+    st.write("")
+    _confirm(rows)
 
-    st.subheader(f"Risk {lvl}  ·  총 ε = {eps:.0f}  ·  k = {k} rounds")
-    st.caption(
-        f"대상 DB : `{DBNAME}` · "
-        f"현재 확정 : Risk {ACTIVE['risk_level']} (ε = {ACTIVE['total_epsilon']:.0f})"
-    )
 
-    # ── 시각화 A : 라운드별 신뢰구간 수렴 (0928 구현) ──
-    # 에이전트를 호출하지 않고, 참평균 + 설정값으로 라플라스 노이즈를 주입한
-    # 합성 응답을 재생한다. 상대폭-임계값 비교는 하지 않는다(총 ε 은 Risk 로 확정).
-    if dp_sim.is_supported(DBNAME):
-        try:
-            _sim = dp_sim.simulate(DBNAME, lvl)
-            # render_convergence 도 try 안에 둔다 — 시각화 단계의 실패(축범위 등)가
-            # 트레이스백으로 새지 않고 안내 문구로 끝나게 하기 위함.
-            dp_viz.render_convergence(
-                _sim, state_key=f"dpviz_played_{DBNAME}_{lvl}"
-            )
-        except Exception as _e:
-            st.error(f"시뮬레이션을 실행하지 못했습니다: {_e}")
-    else:
-        st.info(
-            f"`{DBNAME}` 는 아직 시뮬레이션 대상 컬럼이 등록되어 있지 않습니다. "
-            f"`ui/dp_sim.py` 의 `SIM_TARGET` 에 추가하세요."
+# ── 매트릭스 ────────────────────────────────────────────
+
+def _matrix(rows: list[dict]) -> None:
+    """데이터셋(행) × 리스크(열) CI 폭 표. 셀은 막대로도 보여준다."""
+    all_w = [w for r in rows for w in r["widths"].values()]
+    wmax = max(all_w) if all_w else 1.0
+
+    head = ('<div style="display:grid;grid-template-columns:1.5fr repeat(5,1fr) 74px;'
+            'gap:8px;padding:6px 10px;border-bottom:1px solid #e4e8ee">'
+            '<span class="mono dim" style="font-size:7.5px;letter-spacing:.08em">DATASET</span>')
+    head += "".join(f'<span class="mono dim" style="font-size:7.5px;text-align:right">RISK {r}</span>'
+                    for r in RISKS)
+    head += '<span class="mono dim" style="font-size:7.5px;text-align:right">Δ축소</span></div>'
+
+    body = []
+    for r in rows:
+        w = r["widths"]
+        cells = "".join(_cell(w.get(k), wmax) for k in RISKS)
+        first, last = w.get(1), w.get(5)
+        delta = f"{first / last:.1f}×" if first and last else "-"
+        body.append(
+            '<div style="display:grid;grid-template-columns:1.5fr repeat(5,1fr) 74px;'
+            'gap:8px;padding:8px 10px;border-bottom:1px solid #eef1f5;align-items:center">'
+            f'<span><span style="font-size:10px;font-weight:600;color:#101828">{r["title"]}</span>'
+            f'<span class="mono dim" style="font-size:7.5px;display:block">{r["name"]}'
+            f' · k={r["k"]}</span></span>' + cells +
+            f'<span class="mono" style="font-size:9.5px;text-align:right;color:#0d9f7a">{delta}</span>'
+            "</div>"
         )
 
-    # ── 시각화 스텁 B ────────────────────────
-    with st.container(border=True):
-        st.info("🔀 [시각화 B 자리]  인접 DB 신뢰구간 겹침 비교")
-        st.caption(
-            "Overlap ratio · Δ (민감도) 지표가 이 자리에 표시됩니다."
-        )
+    st.markdown('<div class="card" style="padding:6px 4px 0"><div class="rh" '
+                'style="padding:0 6px 2px">리스크별 최종 95% CI 폭</div>'
+                '<div class="dim" style="font-size:8.5px;padding:0 6px 8px">'
+                '각 셀 = 시뮬레이션 마지막 라운드의 신뢰구간 폭 (작을수록 정밀)</div>'
+                + head + "".join(body) + "</div>", unsafe_allow_html=True)
 
-    # ── 해설 스텁 ────────────────────────────
-    with st.container(border=True):
-        st.markdown("##### 해설")
-        st.write(
-            f"[해설 자리]  Risk {lvl} 은 총 ε = {eps:.0f} 을 사용하며 "
-            f"{k} 회 라운드를 실행합니다. 실제 신뢰구간 수렴 정도와 인접 DB "
-            f"CI 겹침 비율에 대한 해설이 이 자리에 표시됩니다."
-        )
 
-    # ── 확정 / 취소 ─────────────────────────
-    c1, c2, c3 = st.columns([1, 1, 3])
+def _cell(v: float | None, wmax: float) -> str:
+    if v is None:
+        return '<span class="mono dim" style="font-size:9px;text-align:right">—</span>'
+    pct = max(6.0, min(100.0, v / wmax * 100))
+    return ('<span style="display:flex;flex-direction:column;gap:2px">'
+            f'<span class="mono" style="font-size:9px;text-align:right;color:#333f52">{v:,.1f}</span>'
+            '<span style="height:3px;border-radius:9px;background:#eef1f5;overflow:hidden">'
+            f'<span style="display:block;height:100%;width:{pct:.0f}%;'
+            'background:linear-gradient(90deg,#cdd2fb,#5457e0)"></span></span></span>')
+
+
+# ── 정책 확정 ───────────────────────────────────────────
+
+def _confirm(rows: list[dict]) -> None:
+    admin = st.session_state.get("username") or "admin"
+    names = [r["name"] for r in rows]
+    st.markdown('<div class="card"><div class="rh">데이터셋 기본 정책 확정</div>'
+                '<div class="dim" style="font-size:9px;margin-bottom:8px">'
+                '확정된 정책은 개인 오버라이드가 없는 모든 분석가에게 적용됩니다</div>',
+                unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns([1.4, 1.1, 1.6, 0.8], vertical_alignment="bottom")
     with c1:
-        note = st.text_input(
-            "확정 노트 (선택)",
-            key="policy_confirm_note",
-            placeholder="예) 데모 시연용 Risk 3 채택",
-            label_visibility="collapsed",
-        )
+        ds = st.selectbox("데이터셋", names, key="pol_ds",
+                          format_func=lambda k: f"{next(r['title'] for r in rows if r['name'] == k)} · {k}")
     with c2:
-        if st.button("✓ 확정", type="primary", width='stretch'):
-            new_active = db.confirm_policy(
-                admin=ME, db_name=DBNAME, risk_level=int(lvl),
-                note=note or None,
-            )
-            state.log(
-                "policy_confirm",
-                f"{DBNAME}: Risk {new_active['risk_level']} "
-                f"(ε={new_active['total_epsilon']:.1f})",
-            )
-            st.session_state.policy_modal_open = False
-            st.session_state.policy_modal_level = None
-            st.success(
-                f"`{DBNAME}` 이(가) Risk {new_active['risk_level']} 로 확정되었습니다.",
-                icon="✅",
-            )
-            st.rerun()
+        lv = st.selectbox("리스크", RISKS, index=2, key="pol_lv",
+                          format_func=lambda x: f"Risk {x} ({db.RISK_TO_EPSILON[x]:.1f} ε)")
     with c3:
-        if st.button("✕ 취소", width='stretch'):
-            st.session_state.policy_modal_open = False
-            st.session_state.policy_modal_level = None
-            st.rerun()
+        note = st.text_input("메모", key="pol_note", placeholder="확정 근거 (선택)")
+    with c4:
+        if st.button("확정", type="primary", key="pol_ok", use_container_width=True):
+            try:
+                db.confirm_policy(admin, ds, int(lv), note or None)
+                st.success(f"{ds} 기본 정책을 Risk {lv} 로 확정했습니다.")
+            except Exception as e:
+                st.error(f"확정하지 못했습니다 ({type(e).__name__}: {e})")
+
+    hist = db.policy_history(limit=8)
+    if hist:
+        st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
+        out = []
+        for h in hist:
+            out.append(
+                '<div style="display:grid;grid-template-columns:76px 1fr 60px 1fr;gap:8px;'
+                'align-items:center;border-bottom:1px solid #eef1f5;padding:5px 0;font-size:9px">'
+                f'<span class="mono dim" style="font-size:8px">{_t(h.get("confirmed_at"))}</span>'
+                f'<span class="mono" style="font-size:9px">{h["db_name"]}</span>'
+                f'<span class="mono" style="font-size:9px">Risk {h["risk_level"]}</span>'
+                f'<span class="dim">{_esc(h.get("note") or "-")}</span></div>'
+            )
+        st.markdown("".join(out), unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-if st.session_state.policy_modal_open:
-    _risk_preview_dialog()
+def _t(v) -> str:
+    if not v:
+        return "-"
+    return str(v).replace("T", " ")[5:16]
 
 
-# ── Matrix (expander) ───────────────────────────
-with st.expander("Matrix · 모든 DB 의 현재 정책", expanded=False):
-    _active_map = db.list_active_policies()
-
-    _rows = []
-    for _dn in ab.catalog.names():
-        _pol = _active_map.get(_dn)
-        _lvl = _pol["risk_level"]    if _pol else db.DEFAULT_POLICY["risk_level"]
-        _eps = _pol["total_epsilon"] if _pol else db.DEFAULT_POLICY["total_epsilon"]
-        _rows.append({
-            "DB":         _dn,
-            "상태":       ("확정" if _pol else "기본값"),
-            "리스크":     f"Risk {_lvl}",
-            "총 ε":      _eps,
-            "라운드 k":  int(_eps / dp_sim.EPS_PER_QUERY),
-            "지원 여부":  "✓" if dp_sim.is_supported(_dn) else "—",
-            "확정 시각":  _pol["confirmed_at"] if _pol else "—",
-        })
-    st.dataframe(pd.DataFrame(_rows), width='stretch', hide_index=True)
-
-
-# ── History ────────────────────────────────────
-with st.expander("History · 확정 이력", expanded=False):
-    _hist = db.policy_history(limit=15)
-    if not _hist:
-        st.info("확정된 정책 이력이 없습니다.")
-    else:
-        st.dataframe(
-            pd.DataFrame(_hist)[
-                ["confirmed_at", "db_name", "admin",
-                 "risk_level", "total_epsilon", "note"]
-            ].rename(columns={
-                "confirmed_at":  "확정 시각",
-                "db_name":       "DB",
-                "admin":         "확정자",
-                "risk_level":    "리스크 레벨",
-                "total_epsilon": "총 ε",
-                "note":          "노트",
-            }),
-            width='stretch', hide_index=True,
-        )
+def _esc(s) -> str:
+    return str(s).replace("<", "&lt;").replace(">", "&gt;")

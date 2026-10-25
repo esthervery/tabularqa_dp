@@ -1,189 +1,172 @@
-### 0919 수정
-"""Budget Requests — 분석가용 리스크 업그레이드 신청.
+"""예산 신청 (분석가) — 리스크 레벨 상향 요청.
 
-Renders (위→아래):
-  [사이드바 슬롯]
-    · My requests 요약 (총 건수 / 대기 건수)
+화면: platform_v14.html 의 '예산 신청'. 카드 1장 안에서
+      질의 대상 → 현재 정책 → 상향 요청 순으로 흐른다 (섹션 분리 없음).
 
-  [메인]
-    1) 헤더 : "Budget Requests" + 부제 + 사용자 이름
-    2) Current status : 현재 이 DB 의 유효 리스크 요약 (Risk N + 총 ε + 출처)
-    3) New Request 컨테이너 :
-        · 대상 DB selectbox (Agent 콘솔에서 프리셋으로 넘어왔으면 그 값)
-        · 요청 레벨 라디오 (current+1 ~ 5 만 노출)
-        · 사유 textarea
-        · [신청 제출]
-    4) History : 내 신청 이력 카드 리스트
-
-핵심 상태 키
-    req_prefill_db    : Agent 콘솔이 넘긴 프리셋 DB (소비하면 지움)
-    req_prefill_level : Agent 콘솔이 제안한 요청 레벨 (없으면 current+1)
+데이터 경로
+    현재 정책 : db.get_effective_policy  (오버라이드 > DB 기본 > 시스템 기본)
+    소모 ε    : db.spent_epsilon         (query_log SUM)
+    신청      : requests.create          (status='pending')
+승인되면 requests.decide 가 user_policy_override 를 만들어
+다음 콘솔 진입부터 새 리스크 레벨이 적용된다.
 """
+from __future__ import annotations
+
 import streamlit as st
-from ui import agent_bridge as ab, db, requests as reqs, state, theme
 
-theme.inject_global_css()
+from ui import db, design, fields, requests, state
 
-
-ME = st.session_state.username
-
-
-# ── 사이드바 : My requests 요약 ─────────────────
-with st.session_state.nav_slot:
-    st.caption("My requests")
-    _my = reqs.list_by_user(ME)
-    _n_pending = sum(1 for r in _my if r["status"] == "pending")
-    st.write(f"총 **{len(_my)}**건 · 대기 **{_n_pending}**건")
-    st.divider()
+EPS = 0.1
+try:
+    from ui import dp_sim
+    EPS = float(dp_sim.EPS_PER_QUERY)
+except Exception:
+    dp_sim = None
 
 
-# ── 프리셋 소비 (Agent 콘솔에서 넘어왔을 때) ───
-_prefill_db    = st.session_state.pop("req_prefill_db", None)
-_prefill_level = st.session_state.pop("req_prefill_level", None)
-
-if _prefill_db and _prefill_db in ab.catalog.names():
-    # selectbox 가 아직 생성되기 전에 세션 값을 갈아끼움
-    st.session_state["req_db_choice"] = _prefill_db
+ORD = [k for k, v in fields.SPECS.items() if v.get("enabled")]
+TL = {k: fields.SPECS[k]["title"] for k in ORD}
+RISK_EPS = db.RISK_TO_EPSILON
 
 
-# ── 헤더 ────────────────────────────────────────
-head_l, head_r = st.columns([3, 1.4], vertical_alignment="center")
-with head_l:
-    st.title("Budget Requests")
-    st.caption(
-        "이 DB 에 대해 지금보다 높은 리스크 레벨(더 큰 ε 예산)을 관리자에게 요청합니다."
+def render() -> None:
+    design.inject()
+    is_admin = bool(st.session_state.get("is_admin"))
+    st.markdown(design.topbar("예산 신청", "Admin" if is_admin else "Workspace"),
+                unsafe_allow_html=True)
+    st.markdown(design.page_head("예산 신청",
+                                 "더 정밀한 결과가 필요하면 관리자에게 리스크 레벨 상향을 요청합니다"),
+                unsafe_allow_html=True)
+
+    user = st.session_state.get("username") or "analyst"
+    cur = st.session_state.get("db_name")
+    if cur not in ORD:
+        cur = ORD[0]
+
+    # ── 질의 대상 ──
+    head_l, head_r = st.columns([2.4, 1.3], vertical_alignment="center")
+    with head_l:
+        meas = fields.SPECS[cur]["measure"]
+        st.markdown(
+            '<div class="row"><span class="rh" style="margin:0;font-size:11px;font-weight:700">'
+            '질의 대상</span>'
+            f'<span class="mono dim" style="font-size:8px">{meas["label"]} ({meas["col"]})'
+            f' · {_rows(cur):,}행</span></div>', unsafe_allow_html=True)
+    with head_r:
+        pick = st.selectbox("데이터셋", ORD, index=ORD.index(cur),
+                            format_func=lambda k: f"{TL.get(k, k)}  ·  {k}", key="req_ds")
+        if pick != cur:
+            st.session_state.db_name = pick
+            st.rerun()
+
+    # ── 현재 정책 ──
+    pol = db.get_effective_policy(user, pick)
+    risk = int(pol["risk_level"])
+    total = float(pol["total_epsilon"])
+    spent = db.spent_epsilon(user, pick)
+    eps = float(st.session_state.get("eps") or EPS)
+    remain = max(0, int((total - spent) / eps + 1e-9))
+
+    st.markdown(design.line([
+        ("현재 정책", f"Risk {risk}"),
+        ("총 ε", f"{total:.2f}"),
+        ("사용", f"{spent:.2f}"),
+        ("잔여", f"{remain}회"),
+    ]), unsafe_allow_html=True)
+
+    src = {"override": "개인 승인", "db_default": "데이터셋 기본",
+           "system_default": "시스템 기본"}.get(pol.get("source", ""), "")
+    if src:
+        st.markdown(f'<div class="dim" style="font-size:8.5px;margin:5px 0 2px">'
+                    f'정책 출처 · {src}</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
+
+    # ── 상향 요청 ──
+    options = [r for r in sorted(RISK_EPS) if r > risk]
+    if not options:
+        st.markdown(design.empty("이미 최고 리스크 레벨(Risk 5)입니다 — 추가 상향이 없습니다"),
+                    unsafe_allow_html=True)
+        _history(user)
+        return
+
+    lab_l, lab_r = st.columns([1.2, 1.8], vertical_alignment="baseline")
+    with lab_l:
+        st.markdown('<div style="font-size:10.5px;font-weight:700;color:#101828">'
+                    '리스크 상향 요청</div>', unsafe_allow_html=True)
+    with lab_r:
+        st.markdown(f'<div style="font-size:9px;color:#8896a8;text-align:right">'
+                    f'Risk {risk} 보다 높은 단계만 선택할 수 있습니다</div>',
+                    unsafe_allow_html=True)
+
+    chosen = st.radio(
+        "요청 레벨", options, index=0, horizontal=True,
+        format_func=lambda r: f"Risk {r} · 총 ε {RISK_EPS[r]:.1f}",
+        label_visibility="collapsed", key="req_level",
     )
-with head_r:
-    st.write(f"👤 **{ME}**")
+    reason = st.text_area(
+        "신청 사유", placeholder=(
+            f"예: {fields.SPECS[pick]['measure']['label']} 상위 구간의 중앙값을 "
+            f"더 좁은 신뢰구간으로 확인해야 합니다"),
+        height=70, key="req_reason",
+    )
 
-
-# ── 신청 폼 ─────────────────────────────────────
-with st.container(border=True):
-    st.subheader("추가 예산 신청")
-
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        _names = ab.catalog.names()
-        _default_idx = (_names.index(st.session_state.get("req_db_choice",
-                                                          st.session_state.db_name))
-                        if st.session_state.get("req_db_choice",
-                                                st.session_state.db_name) in _names
-                        else 0)
-        db_choice = st.selectbox(
-            "대상 데이터베이스",
-            _names, index=_default_idx,
-            key="req_db_choice",
-            format_func=lambda n: f"{n} · {ab.catalog.meta(n)['title'][:32]}",
-        )
-
-    # 이 사용자 × 이 DB 의 현재 유효 레벨 조회
-    current_pol = db.get_effective_policy(ME, db_choice)
-    current_level = int(current_pol["risk_level"])
-    current_eps   = float(current_pol["total_epsilon"])
-    source_label = {
-        "override":       "개인 오버라이드",
-        "db_default":     "DB 확정 정책",
-        "system_default": "시스템 기본값",
-    }[current_pol["source"]]
-
-    with c2:
-        st.caption(f"현재 유효 정책 · {source_label}")
-        st.metric(
-            "현재 리스크 레벨",
-            f"Risk {current_level} · ε={current_eps:.1f}",
-        )
-
-    # ── 요청 레벨 선택 ─────────────────────
-    upgradable = [lvl for lvl in (2, 3, 4, 5) if lvl > current_level]
-    if not upgradable:
-        st.info(
-            "이미 최고 리스크 레벨(Risk 5) 이 적용되어 있어 "
-            "추가 업그레이드가 불가능합니다.",
-            icon="ℹ️",
-        )
-    else:
-        # 프리셋으로 넘어온 값이 있고 upgradable 안에 있으면 그것을 기본
-        if _prefill_level and _prefill_level in upgradable:
-            _default_lvl = _prefill_level
+    if st.button("신청 제출", type="primary", key="req_submit"):
+        if not reason.strip():
+            st.warning("신청 사유를 입력하세요. 관리자 승인 판단에 쓰입니다.")
         else:
-            _default_lvl = upgradable[0]
-        _default_idx = upgradable.index(_default_lvl)
+            try:
+                rid = requests.create(user, pick, risk, int(chosen), reason)
+                st.success(f"신청 #{rid} 을 접수했습니다 — Risk {risk} → {chosen}. "
+                           f"관리자 승인 후 콘솔에 반영됩니다.")
+                state.log("request", f"{pick} Risk {risk}→{chosen} 신청 #{rid}")
+            except Exception as e:
+                st.error(f"신청을 접수하지 못했습니다 ({type(e).__name__}: {e})")
 
-        with st.form("new_req", clear_on_submit=True):
-            requested_level = st.radio(
-                "요청할 리스크 레벨",
-                options=upgradable,
-                index=_default_idx,
-                horizontal=True,
-                format_func=lambda l: f"Risk {l} (ε={db.RISK_TO_EPSILON[l]:.0f})",
+    _history(user)
+
+
+# ── 내 신청 이력 ────────────────────────────────────────
+
+def _history(user: str) -> None:
+    rows = requests.list_by_user(user)
+    st.markdown('<div class="card"><div class="rh">내 신청 이력</div>', unsafe_allow_html=True)
+    if not rows:
+        st.markdown('<div class="dim" style="font-size:9.5px">아직 신청한 이력이 없습니다</div>',
+                    unsafe_allow_html=True)
+    else:
+        cls = {"pending": "p", "approved": "a", "partial": "a", "rejected": "r"}
+        name = {"pending": "대기", "approved": "승인", "partial": "조정", "rejected": "거절"}
+        out = []
+        for r in rows[:12]:
+            out.append(
+                '<div class="mylog" style="display:grid;grid-template-columns:70px 96px 1fr 54px;'
+                'gap:8px;align-items:center;border-bottom:1px solid #eef1f5;padding:6px 0;font-size:10px">'
+                f'<span class="mono dim" style="font-size:8px">{_t(r.get("created_at"))}</span>'
+                f'<span class="mono" style="font-size:9px">{r.get("db_name")}</span>'
+                f'<span style="color:#5a6779">Risk {r.get("current_level")} → {r.get("requested_level")}'
+                f' · {_esc((r.get("reason") or "")[:40])}</span>'
+                f'<span class="tag {cls.get(r.get("status"), "")}" style="text-align:center">'
+                f'{name.get(r.get("status"), r.get("status"))}</span></div>'
             )
-            reason = st.text_area(
-                "사유 · 설명",
-                placeholder=(
-                    "예) 신용한도 분포를 더 정밀하게 추정해야 하는 분기 리포트 "
-                    "작성을 위해 Risk 3 → Risk 4 로의 업그레이드가 필요합니다."
-                ),
-                height=110,
-            )
-            submitted = st.form_submit_button(
-                "신청 제출", type="primary", width='stretch',
-            )
-            if submitted:
-                if not reason.strip():
-                    st.error("사유를 입력해주세요.")
-                else:
-                    rid = reqs.create(
-                        username=ME, db_name=db_choice,
-                        current_level=current_level,
-                        requested_level=int(requested_level),
-                        reason=reason,
-                    )
-                    state.log(
-                        "request",
-                        f"#{rid} {db_choice}: "
-                        f"Risk {current_level} → Risk {requested_level}",
-                    )
-                    st.success(
-                        f"신청 #{rid} 가 접수되었습니다. 관리자 결재를 기다립니다.",
-                        icon="✅",
-                    )
-                    st.rerun()
+        st.markdown("".join(out), unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ── 내 신청 이력 ────────────────────────────────
-st.subheader("History · 내 신청 이력")
+def _rows(name: str) -> int:
+    """카탈로그(parquet 메타)에서 행 수만 읽는다 — parquet 전체를 로드하지 않는다."""
+    from ui import catalog
+    try:
+        return int(catalog.meta(name).get("n_rows", 0))
+    except Exception:
+        return 0
 
-_mine = reqs.list_by_user(ME)
-if not _mine:
-    st.info("아직 신청 이력이 없습니다.")
-else:
-    _STATUS = {
-        "pending":  ("⏳ 대기",     st.warning),
-        "approved": ("✅ 승인",     st.success),
-        "partial":  ("🟡 부분승인",  st.info),
-        "rejected": ("❌ 거절",     st.error),
-    }
-    for r in _mine:
-        label, alert_fn = _STATUS[r["status"]]
-        appr_lvl = r["approved_level"]
-        appr_str = f"Risk {appr_lvl}" if appr_lvl is not None else "—"
 
-        with st.container(border=True):
-            head_l, head_r = st.columns([3, 1])
-            with head_l:
-                st.write(
-                    f"**#{r['id']}** · `{r['db_name']}` · "
-                    f"Risk {r['current_level']} → Risk {r['requested_level']}"
-                )
-            with head_r:
-                alert_fn(label)
+def _t(v) -> str:
+    if not v:
+        return "-"
+    return str(v).replace("T", " ")[5:16]
 
-            st.caption(
-                f"승인 결과 : **{appr_str}** · "
-                f"신청 {r['created_at'][5:16].replace('T', ' ')}"
-                + (f" · 결재 {r['reviewed_at'][5:16].replace('T', ' ')}"
-                   if r["reviewed_at"] else "")
-            )
-            st.write(r["reason"])
-            if r["admin_note"]:
-                st.caption(f"관리자 노트 — \"{r['admin_note']}\"")
+
+def _esc(s) -> str:
+    return str(s).replace("<", "&lt;").replace(">", "&gt;")
