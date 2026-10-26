@@ -673,8 +673,22 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .stApp .hcell.mono{ font-family:"IBM Plex Mono",monospace; font-size:12px; }
 .stApp .hcell.ans{ font-family:"IBM Plex Mono",monospace; font-size:12.5px; }
 
-/* '자세히 보기' 버튼 (key=det_{id}) — 오른쪽 끝 정렬 */
-.stApp div[class*="st-key-det_"]{ display:flex; justify-content:flex-end; }
+/* '자세히 보기' (key=det_{id}) — 콘솔 '예산 신청/관리' 링크(to_budget)와 같은 텍스트 링크 */
+.stApp div[class*="st-key-det_"],
+.stApp div[class*="st-key-det_"] .stButton{
+  display:flex; justify-content:flex-start; align-items:center; margin:0 !important;
+}
+.stApp div[class*="st-key-det_"] button{
+  height:22px !important; min-height:22px !important; padding:0 !important;
+  line-height:22px !important; display:flex !important; align-items:center !important;
+  border:none !important; background:transparent !important; box-shadow:none !important;
+}
+.stApp div[class*="st-key-det_"] button p{
+  margin:0 !important; line-height:22px !important;
+  font-size:13px !important; font-weight:600 !important; color:var(--pri) !important;
+  white-space:nowrap;
+}
+.stApp div[class*="st-key-det_"] button:hover p{ color:var(--pri2) !important; text-decoration:underline; }
 
 /* ── 8-2. 상세 대화상자 + history_card() ── */
 div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-all; }

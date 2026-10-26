@@ -88,7 +88,7 @@ def _matrix(rows: list[dict]) -> None:
     grid = "grid-template-columns:1.6fr repeat(5,1fr) 80px"
 
     head = (f'<div class="trow head" style="{grid}"><span>데이터셋</span>'
-            + "".join(f'<span class="r">Utility {r} · ε{db.RISK_TO_EPSILON[r]:.0f}</span>'
+            + "".join(f'<span class="r">Utility {r}</span>' # · ε{db.RISK_TO_EPSILON[r]:.0f}</span>'
                       for r in RISKS)
             + '<span class="r">축소</span></div>')
 
@@ -108,9 +108,11 @@ def _matrix(rows: list[dict]) -> None:
 
     with st.container(border=True, key="card_matrix"):
         st.markdown(design.card_head(
-            "Utility별 최종 95% CI 폭",
-            "각 셀 = 시뮬레이션 마지막 라운드의 신뢰구간 폭 (작을수록 정밀) · "
-            "축소 = Utility 1 대비 Utility 5 의 폭 축소 배율"),
+            # "Utility별 최종 95% CI 폭",
+            "프라이버시 리스크 분석",
+            #"각 셀 = 시뮬레이션 마지막 라운드의 신뢰구간 폭 (작을수록 정밀) · "
+            "신뢰구간 상대폭 기반 유틸리티 정책 별 위험도 분석"),
+            #"축소 = Utility 1 대비 Utility 5 의 폭 축소 배율"),
             unsafe_allow_html=True)
         st.markdown(head + "".join(body), unsafe_allow_html=True)
 
@@ -130,8 +132,8 @@ def _confirm(row: dict) -> None:
 
     with st.container(border=True, key="card_confirm"):
         st.markdown(design.card_head(
-            "데이터셋 기본 정책 확정",
-            f"대상: {row['title']} · {ds} — 확정된 정책은 개인 오버라이드가 없는 모든 분석가에게 적용됩니다."),
+            "데이터셋 기본 정책 설정",
+            f"대상: {row['title']}"), # · {ds} — 확정된 정책은 개인 오버라이드가 없는 모든 분석가에게 적용됩니다."),
             unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns([1.1, 2.2, 0.8], vertical_alignment="bottom")

@@ -64,7 +64,7 @@ def _table(rows: list[dict]) -> None:
         with st.container(key="hhead"):
             h = st.columns(COLS, vertical_alignment="center")
             for i, t in enumerate(HEAD):
-                h[i].html(f'<div class="hcol{" r" if i == len(HEAD) - 1 else ""}">{t}</div>')
+                h[i].html(f'<div class="hcol">{t}</div>')
 
         for r in rows:
             ok = bool(r.get("ok"))
