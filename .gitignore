@@ -2,7 +2,6 @@
 *.zip
 competition_origin/
 results/
-
 __pycache__
 dp_demo.db
 environment.yml

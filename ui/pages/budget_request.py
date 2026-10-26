@@ -1,18 +1,14 @@
-"""예산 신청 (분석가) — 리스크 레벨 상향 요청.
+"""예산 신청 (분석가) — Utility 레벨 상향 요청.
 
 Renders (위→아래):
-    1) 페이지 제목
-    2) 신청 카드 : 질의 대상(데이터셋 선택) + 현재 정책 도넛/요약
-                   → 리스크 상향 레벨(세그먼트) → 사유 → [신청 제출]
-    3) 내 신청 이력 카드 (표 형태 + 상태 뱃지)
+    1) 신청 카드 : 신청 대상(왼쪽) + 도넛 카드(오른쪽, 콘솔과 같은 budget_meter)
+                   → Utility 레벨 선택(고정 폭 버튼) → 사유 → [신청 제출]
+    2) 내 신청 이력 (상단 바에서 고른 데이터셋만)
 
 데이터 경로
     현재 정책 : db.get_effective_policy  (오버라이드 > DB 기본 > 시스템 기본)
     소모 ε    : db.spent_epsilon         (query_log SUM)
     신청      : requests.create          (status='pending')
-승인되면 requests.decide 가 user_policy_override 를 만들어
-다음 콘솔 진입부터 새 리스크 레벨이 적용된다.
-(로직은 demo 브랜치 원본과 동일 — 레이아웃·스타일만 변경)
 """
 from __future__ import annotations
 
@@ -30,124 +26,139 @@ except Exception:         # noqa: BLE001
 ORD = [k for k, v in fields.SPECS.items() if v.get("enabled")]
 TL = {k: fields.SPECS[k]["title"] for k in ORD}
 RISK_EPS = db.RISK_TO_EPSILON
+HIST_MAX = 12
+FLASH_KEY = "req_flash"   # 제출 후 rerun 너머로 알림 문구를 넘기는 세션 키
+LV_WIDTH = 112            # 레벨 버튼 고정 폭(px)
 
 
 def render() -> None:
     design.inject()
-    # st.markdown(design.page_hero(
-    #     "예산 신청",
-    #     "더 정밀한 결과가 필요하면 관리자에게 리스크 레벨 상향을 요청합니다."),
-    #     unsafe_allow_html=True)
+
+    # 제출 직후 rerun 에서 한 번만 띄우고 지운다 → 4초 뒤 자동으로 사라짐
+    flash = st.session_state.pop(FLASH_KEY, None)
+    if flash:
+        st.toast(flash, duration="short")
 
     user = st.session_state.get("username") or "analyst"
-    cur = st.session_state.get("db_name")
-    if cur not in ORD:
-        cur = ORD[0]
+    pick = st.session_state.get("db_name")
+    if pick not in ORD:
+        pick = ORD[0]
+
+    pol = db.get_effective_policy(user, pick)
+    risk = int(pol["risk_level"])
+    total = float(pol["total_epsilon"])
+    spent = db.spent_epsilon(user, pick)
+    eps = float(st.session_state.get("eps") or EPS)
+    remain = max(0, int((total - spent) / eps + 1e-9))
+    src = {"override": "개인 승인", "db_default": "데이터셋 기본",
+           "system_default": "시스템 기본"}.get(pol.get("source", ""), "-")
+    meas = fields.SPECS[pick]["measure"]
 
     with st.container(border=True, key="card_request"):
-        # ── 질의 대상 + 현재 정책 ──
-        left, right = st.columns([1.6, 1], gap="large", vertical_alignment="center")
-        with left:
-            meas = fields.SPECS[cur]["measure"]
-            st.markdown(design.card_head(
-                "질의 대상",
-                f"측정 대상 · {meas['label']} ({meas['col']}) · {_rows(cur):,}행"),
-                unsafe_allow_html=True)
-            pick = cur   # 데이터셋은 상단 바에서 고른다
+        # 왼쪽·오른쪽 1:1 → 구분선(rqform 왼쪽 테두리)이 정가운데
+        with st.container(horizontal=True, vertical_alignment="top",
+                          gap="small", wrap=False, key="rqtop"):
+            # ── 왼쪽: [신청 대상 + 도넛] / 신청 이력 ──
+            with st.container(key="rqleft", width="stretch"):
+                with st.container(horizontal=True, vertical_alignment="top",
+                                  gap="medium", wrap=False, key="rqhead"):
+                    with st.container(key="rqinfo", width="content"):
+                        st.markdown(design.card_head(
+                            "신청 대상", f"{TL[pick]} · 통계 대상 {meas['label']}"),
+                            unsafe_allow_html=True)
+                        st.markdown(design.line([
+                            ("현재 정책", f"Utility {risk}"),
+                            ("ε 예산", f"{total:.2f}"),
+                            ("정책 출처", src),
+                        ]), unsafe_allow_html=True)
+                    with st.container(key="cbring", border=True, width=250):
+                        st.markdown(design.budget_meter(spent, total, remain, size=84),
+                                    unsafe_allow_html=True, width="stretch")
+                _history(user, pick)
+
+            # ── 오른쪽: 레벨 선택 + 사유 + 제출 ──
+            with st.container(key="rqform", width="stretch"):
+                _levels(user, pick, risk)
 
 
-        pol = db.get_effective_policy(user, pick)
-        risk = int(pol["risk_level"])
-        total = float(pol["total_epsilon"])
-        spent = db.spent_epsilon(user, pick)
-        eps = float(st.session_state.get("eps") or EPS)
-        remain = max(0, int((total - spent) / eps + 1e-9))
-        src = {"override": "개인 승인", "db_default": "데이터셋 기본",
-               "system_default": "시스템 기본"}.get(pol.get("source", ""), "")
+# ── Utility 레벨 선택 ──────────────────────────────────
+def _levels(user: str, pick: str, risk: int) -> None:
+    top = max(RISK_EPS)
+    maxed = risk >= top
+    note = ('<span class="rqnote">이미 최고 Utility 레벨에 도달했습니다</span>'
+            if maxed else "")
+    st.html(f'<div class="rqtitle">Utility 레벨 선택{note}</div>')
 
-        with left:
-            st.markdown(design.line([
-                ("현재 정책", f"Utility {risk}"),
-                ("총 ε", f"{total:.2f}"),
-                ("정책 출처", src or "-"),
-            ]), unsafe_allow_html=True)
-        with right:
-            st.markdown(design.donut_card(spent, total, sub=f"잔여 {remain}회 질의 가능"),
-                        unsafe_allow_html=True)
+    sk = f"req_pick_{pick}"                       # 데이터셋별 선택 기억
+    if not maxed and (st.session_state.get(sk) or 0) <= risk:
+        st.session_state[sk] = risk + 1
+    chosen = st.session_state.get(sk)
 
-        st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
+    with st.container(horizontal=True, gap="small", wrap=False, key="lvrow"):
+        for r in sorted(RISK_EPS):
+            e = f"ε {RISK_EPS[r]:.0f}"
+            if r <= risk:                         # 현재·하위 레벨: 점선 + 클릭 불가
+                is_cur = r == risk
+                st.button(f"Utility {r}\n\n{'현재 · ' if is_cur else ''}{e}",
+                          key=f"lvl_cur_{r}" if is_cur else f"lvl_off_{r}",
+                          disabled=True, width="stretch", wrap=True)
+            else:
+                on = r == chosen
+                if st.button(f"Utility {r}\n\n{e}",
+                             key=f"lvl_on_{r}" if on else f"lvl_go_{r}",
+                             width="stretch", wrap=True):
+                    st.session_state[sk] = r
+                    st.rerun()
 
-        # ── 상향 요청 ──
-        options = [r for r in sorted(RISK_EPS) if r > risk]
-        if not options:
-            st.markdown(design.empty("이미 최고 Utility 레벨(Utility 5)입니다 — 추가 상향이 없습니다"),
-                        unsafe_allow_html=True)
-        else:
-            st.markdown(design.card_head(
-                "Utility 상향 요청",
-                f"Utility {risk} 보다 높은 단계만 선택할 수 있습니다."),
-                unsafe_allow_html=True)
+    if maxed:
+        return
 
-            chosen = st.radio(
-                "요청 레벨", options, index=0, horizontal=True,
-                format_func=lambda r: f"Utility {r} · 총 ε {RISK_EPS[r]:.0f}",
-                label_visibility="collapsed", key="req_level",
-            )
-            reason = st.text_area(
-                "신청 사유", placeholder=(
-                    f"예: {fields.SPECS[pick]['measure']['label']} 상위 구간의 중앙값을 "
-                    f"더 좁은 신뢰구간으로 확인해야 합니다"),
-                height=90, key="req_reason",
-            )
-
-            if st.button("신청 제출", type="primary", key="req_submit",
-                         use_container_width=True):
-                if not reason.strip():
-                    st.warning("신청 사유를 입력하세요. 관리자 승인 판단에 쓰입니다.")
-                else:
-                    try:
-                        rid = requests.create(user, pick, risk, int(chosen), reason)
-                        st.success(f"신청 #{rid} 을 접수했습니다 — Utility {risk} → {chosen}. "
-                                   f"관리자 승인 후 콘솔에 반영됩니다.")
-                        state.log("request", f"{pick} Utility {risk}→{chosen} 신청 #{rid}")
-                    except Exception as e:
-                        st.error(f"신청을 접수하지 못했습니다 ({type(e).__name__}: {e})")
-
-    _history(user)
-
-
-# ── 내 신청 이력 ────────────────────────────────────────
-
-def _history(user: str) -> None:
-    rows = requests.list_by_user(user)
-    with st.container(border=True, key="card_myreq"):
-        st.markdown(design.card_head("내 신청 이력", f"최근 {min(len(rows), 12)}건"),
-                    unsafe_allow_html=True)
-        if not rows:
-            st.markdown(design.empty("아직 신청한 이력이 없습니다"), unsafe_allow_html=True)
+    rk = f"req_reason_{pick}"
+    reason = st.text_area(
+        "신청 사유", placeholder=(
+            f"예: {fields.SPECS[pick]['measure']['label']} 상위 구간의 중앙값을 "
+            f"더 좁은 신뢰구간으로 확인해야 합니다"),
+        height=84, key=rk,
+    )
+    if st.button("신청 제출", type="primary", key="req_submit", width="stretch"):
+        if not reason.strip():
+            st.toast("신청 사유를 입력하세요. 관리자 승인 판단에 쓰입니다.")
             return
-        grid = "grid-template-columns:96px 130px 120px 1fr 70px"
-        out = [f'<div class="trow head" style="{grid}"><span>신청</span><span>데이터셋</span>'
-               '<span>레벨</span><span>사유</span><span class="r">상태</span></div>']
-        for r in rows[:12]:
-            out.append(
-                f'<div class="trow" style="{grid}">'
-                f'<span class="t">{_t(r.get("created_at"))}</span>'
-                f'<span class="m">{r.get("db_name")}</span>'
-                f'<span class="m">Utility {r.get("current_level")} → {r.get("requested_level")}</span>'
-                f'<span class="x">{_esc(r.get("reason") or "")}</span>'
-                f'<span class="r">{design.status_pill(r.get("status"))}</span></div>'
-            )
-        st.markdown("".join(out), unsafe_allow_html=True)
+        try:
+            rid = requests.create(user, pick, risk, int(chosen), reason)
+            state.log("request", f"{pick} Utility {risk}→{chosen} 신청 #{rid}")
+        except Exception as e:
+            st.error(f"신청을 접수하지 못했습니다 ({type(e).__name__}: {e})")
+            return
+        # 알림은 rerun 뒤에 띄운다 → 왼쪽 이력 표에도 방금 신청이 바로 보임
+        st.session_state[FLASH_KEY] = (f"Utility {risk} → {chosen} 신청을 접수했습니다. "
+                                       f"관리자 승인 후 콘솔에 반영됩니다.")
+        st.session_state.pop(rk, None)            # 사유 입력칸 비우기
+        st.rerun()
 
 
-def _rows(name: str) -> int:
-    """카탈로그(parquet 메타)에서 행 수만 읽는다 — parquet 전체를 로드하지 않는다."""
-    from ui import catalog
-    try:
-        return int(catalog.meta(name).get("n_rows", 0))
-    except Exception:
-        return 0
+# ── 신청 이력 (카드 안 왼쪽 아래 · 선택한 데이터셋만) ─────────
+def _history(user: str, pick: str) -> None:
+    rows = [r for r in requests.list_by_user(user)
+            if r.get("db_name") == pick][:HIST_MAX]
+    head = f'<div class="rqhtitle">신청 이력<span>{len(rows)}건</span></div>'
+    if not rows:
+        st.html(head + '<div class="rqhempty">아직 신청 이력이 없습니다</div>')
+        return
+
+    grid = "grid-template-columns:84px 108px minmax(0,1fr) 60px"
+    out = [f'<div class="trow head" style="{grid}"><span>신청</span>'
+           '<span>레벨</span><span>사유</span><span class="r">상태</span></div>']
+    for r in rows:
+        why = _esc(r.get("reason") or "")
+        out.append(
+            f'<div class="trow" style="{grid}">'
+            f'<span class="t">{_t(r.get("created_at"))}</span>'
+            f'<span class="m">Utility {r.get("current_level")} → {r.get("requested_level")}</span>'
+            f'<span class="x" title="{why}">{why}</span>'
+            f'<span class="r">{design.status_pill(r.get("status"))}</span></div>'
+        )
+    st.html(head + '<div class="rqhist">' + "".join(out) + "</div>")
 
 
 def _t(v) -> str:

@@ -17,43 +17,38 @@ ALL = "전체"
 COLS = (1.15, 4.6, 0.7, 0.85, 2.6, 1.05)        # 시각·질의·ε·상태·응답·상세
 HEAD = ("시각", "질의", "ε", "상태", "응답", "상세")
 
+PAGE_SIZE = 10                                   # 한 페이지 행 수 (번호 버튼은 최대 7개)
+
 
 def render() -> None:
     design.inject()
-    # st.markdown(design.page_head("채팅 히스토리",
-    #                              "데이터셋별 질의·응답 기록 — 감사 추적용으로 삭제되지 않습니다"),
-    #             unsafe_allow_html=True)
-
-    cur = st.session_state.get("db_name")
-    if cur not in ORD:
-        cur = ORD[0]
 
     pick = st.session_state.get("hist_ds") or ALL        # 표시용 ('전체' 또는 데이터셋 키)
     scope = None if pick == ALL else pick                # 조회용 (None = 전체)
 
-
-    limit = st.selectbox("표시 개수", [20, 50, 100, 200], index=1, key="hist_limit", width=160)
-
     user = st.session_state.get("username") or "analyst"
-    rows  = db.list_queries(user, scope, limit=int(limit))
-    spent = db.spent_epsilon(user, scope)
+    total  = db.count_queries(user, scope, only_ok=False)
     ok_n   = db.count_queries(user, scope, only_ok=True)
-    fail_n = db.count_queries(user, scope, only_ok=False) - ok_n
-
+    spent  = db.spent_epsilon(user, scope)
 
     st.markdown(design.line([
         ("질의", f"{ok_n}건"),
-        ("차단·실패", f"{fail_n}건"),
+        ("차단·실패", f"{total - ok_n}건"),
         ("누적 ε", f"{spent:.2f}"),
         ("데이터셋", ALL if scope is None else pick),
     ]), unsafe_allow_html=True)
     st.write("")
 
-    if not rows:
+    if total == 0:
         st.markdown(design.empty("해당 범위에 기록이 없습니다"), unsafe_allow_html=True)
         return
 
-    _table(rows)
+    slot = st.container()                                 # 표 자리 — 번호 버튼보다 위
+    start, _ = design.pager(total, PAGE_SIZE, "hist_page", reset_on=scope)
+    rows = db.list_queries(user, scope, limit=PAGE_SIZE, offset=start)
+
+    with slot:
+        _table(rows)
     _dialog(rows)
 
 

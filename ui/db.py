@@ -501,15 +501,16 @@ def log_query(username: str, db_name: str,
         return int(cur.lastrowid)
 
 
-def list_queries(username: str, db_name: str | None = None, limit: int = 100) -> list[dict]:
-    """질의 기록 (시각 최신순). db_name=None 이면 전체 데이터셋."""
+def list_queries(username: str, db_name: str | None = None,
+                 limit: int = 100, offset: int = 0) -> list[dict]:
+    """질의 기록 (시각 최신순). db_name=None 이면 전체 데이터셋. offset 은 페이지 나누기용."""
     sql = "SELECT * FROM query_log WHERE username = ?"
     args: list = [username]
     if db_name:                       # None/'전체' → 조건 없이 전체
         sql += " AND db_name = ?"
         args.append(db_name)
-    sql += " ORDER BY asked_at DESC, id DESC LIMIT ?"
-    args.append(int(limit))
+    sql += " ORDER BY asked_at DESC, id DESC LIMIT ? OFFSET ?"
+    args += [int(limit), int(offset)]
     with connect() as con:
         rows = con.execute(sql, args).fetchall()
     return [dict(r) for r in rows]
@@ -527,12 +528,12 @@ def count_queries(username: str, db_name: str | None = None, only_ok: bool = Tru
         return int(con.execute(q, args).fetchone()["c"])
 
 
-def spent_epsilon(username: str, db_name: str) -> float:
-    """해당 (계정 × 데이터셋) 의 누적 소모 ε."""
+def spent_epsilon(username: str, db_name: str | None = None) -> float:
+    """누적 소모 ε. db_name=None 이면 이 계정의 전체 데이터셋 합계."""
+    q = "SELECT COALESCE(SUM(eps_spent), 0.0) AS s FROM query_log WHERE username = ?"
+    args: list = [username]
+    if db_name:
+        q += " AND db_name = ?"
+        args.append(db_name)
     with connect() as con:
-        row = con.execute(
-            "SELECT COALESCE(SUM(eps_spent), 0.0) AS s FROM query_log "
-            "WHERE username = ? AND db_name = ?",
-            (username, db_name),
-        ).fetchone()
-    return float(row["s"])
+        return float(con.execute(q, args).fetchone()["s"])

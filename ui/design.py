@@ -75,7 +75,7 @@ _CSS = """
 /* ════════════════════════════════════════════════════════════════
    1. 공통 · 골격 / 타이포
    ════════════════════════════════════════════════════════════════ */
-html,body,[class*="st-"],.stApp,button,input,textarea,select{
+html,body,[class*="st-"]:not([data-testid="stIconMaterial"]),.stApp,button,input,textarea,select{
   font-family:var(--sans) !important; -webkit-font-smoothing:antialiased;
 }
 .stApp{background:#fff}
@@ -797,6 +797,184 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
   margin:0 0 12px;box-shadow:var(--shadow)}
 .card .rh{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:12px}
 .card .rsub{font-size:12px;color:var(--mid)}
+
+/* ════════════════════════════════════════════════════════════════
+   10-2. [budget_admin.py] 예산 관리 — 요약 줄 · 표 보조 · 상세 대화상자
+         + [history · budget_admin] 페이지 번호 줄
+   ════════════════════════════════════════════════════════════════ */
+/* 요약 줄 (대기 · 승인 · 거절 · 전체) */
+.asum{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  border:1px solid var(--bd);border-radius:12px;background:var(--wash);
+  padding:12px 18px;margin:0 0 4px}
+.asum .it{display:flex;align-items:baseline;gap:8px}
+.asum .k{font-size:12.5px;font-weight:600;color:var(--mid)}
+.asum b{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.asum .it.p b{color:var(--wrn2)}
+.asum .s{font-size:11.5px;color:var(--dim)}
+.asum .vl{width:1px;height:18px;background:var(--bd)}
+
+/* 상세 대화상자 — 카드 없이 정의 목록 + 스크롤 표 */
+.rqtop{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+.rqtop .tm{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.rqdl{display:grid;grid-template-columns:84px 1fr;column-gap:16px;margin:0;
+  background:var(--wash);border-radius:10px;padding:4px 16px}
+.rqdl dt,.rqdl dd{margin:0;padding:10px 0;border-bottom:1px solid var(--bd2)}
+.rqdl dt:nth-last-of-type(1),.rqdl dd:last-of-type{border-bottom:none}
+.rqdl dt{font-size:12px;font-weight:600;color:var(--mid)}
+.rqdl dd{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;font-size:14px;color:var(--ink)}
+.rqdl dd b{font-weight:700}
+.rqdl dd b.up{color:var(--pri2)}
+.rqdl .arr{color:var(--dim);margin:0 2px}
+.rqdl .dot{color:var(--dim)}
+.rqdl .mono{font-family:var(--mono);font-size:13px}
+.rqdl .sub{margin-left:8px;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.rqdl dd.why{display:block;line-height:1.7;white-space:pre-wrap}
+
+/* 질의 기록 — 제목 줄 + 고정 높이 스크롤 표 */
+.rqsec{display:flex;align-items:baseline;gap:8px;margin:14px 0 2px;
+  font-size:13px;font-weight:700;color:var(--ink)}
+.rqsec span{font-size:11.5px;font-weight:500;color:var(--dim)}
+.rqnone{font-size:12.5px;color:var(--dim);padding:10px 0}
+.stApp .st-key-rqlog{padding:0 !important;border-radius:10px !important}
+.rqtbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.rqtbl thead th{position:sticky;top:0;z-index:1;background:#f8fafc;text-align:left;
+  font-size:11.5px;font-weight:600;color:var(--mid);padding:8px 12px;
+  border-bottom:1px solid var(--bd)}
+.rqtbl td{padding:8px 12px;border-bottom:1px solid #eef0f4;color:var(--ink2);vertical-align:middle}
+.rqtbl tr:last-child td{border-bottom:none}
+.rqtbl td.tm{font-family:var(--mono);font-size:11.5px;color:var(--dim);white-space:nowrap}
+.rqtbl td.q{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rqtbl td.mono{font-family:var(--mono);white-space:nowrap}
+
+/* ① 대화상자 제목 크게 */
+.stApp [data-testid="stDialog"] h2,
+div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;letter-spacing:-.02em}
+
+/* ⑥ primary 버튼 글자 흰색 — 전역 p{color} 규칙이 버튼 안 <p> 를 덮던 문제 */
+.stApp [data-testid="stBaseButton-primary"],
+.stApp [data-testid="stBaseButton-primary"] p,
+.stApp [data-testid="stBaseButtonPrimary"] p{color:#fff !important}
+
+/* 상세 대화상자 */
+.rqhead{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+.rqhead .id{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--mid)}
+.rqhead .tm{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.rqgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 14px}
+.rqgrid>div{border:1px solid var(--bd);border-radius:10px;background:#fff;padding:10px 12px;
+  display:flex;flex-direction:column;gap:3px}
+.rqgrid .k,.rqbox .k{font-size:11px;font-weight:600;color:var(--mid);letter-spacing:.02em}
+.rqgrid b{font-size:15px;font-weight:700;color:var(--ink)}
+.rqgrid b.up{color:var(--pri2)}
+.rqgrid .s{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.rqbox{border:1px solid var(--bd2);background:var(--wash);border-radius:10px;
+  padding:12px 14px;margin:0 0 10px}
+.rqbox p{margin:6px 0 0;font-size:13.5px;line-height:1.7;color:var(--ink);white-space:pre-wrap}
+
+/* 페이지 번호 줄 */
+.stApp .st-key-hist_page_wrap,.stApp .st-key-adm_page_wrap{margin-top:12px}
+
+/* ════════════════════════════════════════════════════════════════
+   11-2. [budget_request.py] 예산 신청 — ε 도넛 카드 · Utility 레벨 카드 버튼
+   ════════════════════════════════════════════════════════════════ */
+.stApp .st-key-rqhead{ align-items:flex-start !important; }
+
+/* 왼쪽: 신청 대상 — 정책 줄은 글자 길이만큼만 */
+.stApp .st-key-rqinfo{ padding-top:2px; }                       /* ① */
+.stApp .st-key-rqinfo .reqline{
+  display:inline-flex !important; width:auto !important; white-space:nowrap; }
+.stApp .st-key-rqinfo .reqline b{
+  font-family:var(--sans) !important; letter-spacing:0 !important; font-weight:700 !important; }
+
+/* 도넛 카드 (콘솔 cbring 재사용, 이 페이지에서만 여백 축소) */
+.stApp .st-key-card_request .st-key-cbring{
+  padding:12px 14px !important; border-radius:14px !important;
+  background:#fff !important; box-shadow:none !important; }
+
+/* 넣을 블록 — 1:1 분할 + 양쪽 같은 여백 → 구분선 정가운데 */
+.stApp .st-key-rqtop{ gap:0 !important; align-items:stretch !important; }
+.stApp .st-key-rqtop .st-key-rqleft,
+.stApp .st-key-rqtop .st-key-rqform{ flex:1 1 0 !important; min-width:0 !important; }
+.stApp .st-key-rqleft{ padding-right:24px !important; }                /* ② 왼쪽 여백 */
+.stApp .st-key-rqform{ padding-left:24px !important;                   /* ② 오른쪽 여백(왼쪽과 같게) */
+  border-left:1px solid var(--bd2); }
+
+/* 신청 이력 (카드 안) */
+.rqhtitle{ display:flex; align-items:baseline; gap:8px; margin:14px 0 6px;  /* ③ 도넛과 간격 */
+  font-size:13px; font-weight:700; color:var(--ink) !important; }
+.rqhtitle span{ font-size:11.5px; font-weight:500; color:var(--dim) !important; }
+.rqhempty{ font-size:12.5px; color:var(--dim) !important; padding:10px 2px; }
+.rqhist{ max-height:168px; overflow-y:auto; }                              /* ④ 스크롤 시작 높이 */
+.rqhist .trow.head{ position:sticky; top:0; background:#fff; z-index:1; }
+.rqhist .trow .x{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+
+/* 제목 + 최고 레벨 안내 배지 */
+.rqtitle{ display:flex; align-items:center; gap:10px; margin:0 0 8px;
+  font-size:15px; font-weight:700; color:var(--ink) !important; }
+.rqtitle .rqnote{ font-size:12px; font-weight:600; padding:2px 10px; border-radius:999px;
+  color:var(--wrn2) !important; background:var(--wrnsoft); border:1px solid var(--wrnline); }
+
+/* 레벨 버튼 — 폭: 남은 폭을 5등분하되 최대 ③ */
+.stApp .st-key-lvrow div[class*="st-key-lvl_"]{ max-width:132px; }           /* ③ */
+.stApp div[class*="st-key-lvl_"] button{
+  height:auto !important; min-height:0 !important;
+  padding:8px 6px 7px !important;                                            /* ④ */
+  border:1px solid var(--bd) !important; border-radius:10px !important;
+  background:linear-gradient(180deg,#fff, var(--wash)) !important;
+  box-shadow:0 1px 2px rgba(15,23,42,.04) !important;
+  transition:border-color .12s, background .12s, box-shadow .12s, transform .12s; }
+.stApp div[class*="st-key-lvl_"] button [data-testid="stMarkdownContainer"]{
+  display:flex !important; flex-direction:column !important; align-items:center !important;
+  gap:1px !important; }                                                       /* ⑤ */
+.stApp div[class*="st-key-lvl_"] button p{
+  margin:0 !important; line-height:1.2 !important; white-space:nowrap; }
+.stApp div[class*="st-key-lvl_"] button p:first-of-type{
+  font-size:13.5px !important; font-weight:700 !important; color:var(--ink) !important; }  /* ⑥ */
+.stApp div[class*="st-key-lvl_"] button p:last-of-type{
+  font-size:11px !important; font-weight:500 !important; color:var(--mid) !important;
+  font-family:var(--mono) !important; }
+
+/* 선택 가능 — hover */
+.stApp div[class*="st-key-lvl_go_"] button:hover{
+  border-color:var(--priline) !important; background:#fff !important;
+  box-shadow:0 2px 6px rgba(99,102,241,.12) !important; transform:translateY(-1px); }
+
+/* 선택됨 */
+.stApp div[class*="st-key-lvl_on_"] button{
+  background:var(--prisoft) !important; border-color:var(--pri) !important;
+  box-shadow:inset 0 0 0 1px var(--pri), 0 2px 6px rgba(99,102,241,.15) !important; }
+.stApp div[class*="st-key-lvl_on_"] button p:first-of-type{ color:var(--pri2) !important; }
+.stApp div[class*="st-key-lvl_on_"] button p:last-of-type{ color:var(--pri) !important; }
+
+/* 현재·하위 레벨 — 점선 + 클릭 불가 */
+.stApp div[class*="st-key-lvl_cur_"] button,
+.stApp div[class*="st-key-lvl_off_"] button{
+  background:transparent !important; border:1px dashed #cbd5e1 !important;
+  box-shadow:none !important; opacity:1 !important; cursor:not-allowed !important; }
+.stApp div[class*="st-key-lvl_cur_"] button p,
+.stApp div[class*="st-key-lvl_off_"] button p{ color:var(--dim) !important; }
+
+
+
+/* ── 10-1. 예산 관리 · 상태 필터 탭 (segmented_control key="adm_tab") ── */
+.stApp .st-key-adm_tab{ margin:2px 0 12px; }                                     /* ① */
+.stApp .st-key-adm_tab button{
+  min-height:0 !important; padding:8px 18px !important;                          /* ② */
+  background:#fff !important; color:var(--mid) !important; }
+.stApp .st-key-adm_tab button p{
+  font-size:13.5px !important; font-weight:600 !important; color:inherit !important; }  /* ③ */
+.stApp .st-key-adm_tab button:hover{ color:var(--ink) !important; background:var(--wash) !important; }
+
+/* 선택된 탭 — 상태별 색 (탭 순서: 대기 · 승인됨 · 거절됨 · 전체) */
+.stApp .st-key-adm_tab button[data-testid$="Active"]{
+  --tone:var(--pri); --soft:var(--prisoft);
+  background:var(--soft) !important; color:var(--tone) !important;
+  border-color:var(--tone) !important; position:relative; z-index:1; }
+.stApp .st-key-adm_tab button[data-testid$="Active"] p{ font-weight:700 !important; }
+.stApp .st-key-adm_tab button:nth-of-type(1)[data-testid$="Active"]{ --tone:var(--wrn2); --soft:var(--wrnsoft); }
+.stApp .st-key-adm_tab button:nth-of-type(2)[data-testid$="Active"]{ --tone:var(--suc2); --soft:var(--sucsoft); }
+.stApp .st-key-adm_tab button:nth-of-type(3)[data-testid$="Active"]{ --tone:var(--dan2); --soft:var(--dansoft); }
+
 </style>
 """
 
@@ -930,7 +1108,6 @@ def donut(ratio: float, label: str = "", sub: str = "", size: int = 48) -> str:
 
 
 # ── 필드 힌트 ────────────────────────────────────────────
-
 def field_card(f: dict) -> str:
     """필드 1개 카드. kind: categorical(값 칩) / filter(사분위 축) / pattern(이진 칩)."""
     kind = f.get("kind", "categorical")
@@ -967,7 +1144,6 @@ def band(label: str, sub: str, cards: list[str]) -> str:
 
 
 # ── 대화 ────────────────────────────────────────────────
-
 def bubble_user(text: str, meta: str = "") -> str:
     m = f'<div class="qmeta">{meta}</div>' if meta else ""
     return (f'<div class="msg u"><div class="av">U</div><div class="bub">'
@@ -1007,7 +1183,6 @@ def line(pairs: list[tuple[str, str]]) -> str:
 
 
 # ── 내부 유틸 ────────────────────────────────────────────
-
 def _num(v) -> str:
     if v is None:
         return "—"
@@ -1025,7 +1200,6 @@ def _esc(text: str) -> str:
 _KEYWORDS = ("import", "from", "def", "return", "for", "in", "if", "else",
              "df", "and", "or", "not", "groupby", "round", "median", "mean")
 
-
 def _hl(code: str) -> str:
     out = []
     for ln in str(code).split("\n"):
@@ -1041,7 +1215,6 @@ def _hl(code: str) -> str:
 
 # ── 에이전트 응답 카드 (콘솔 전용) ─────────────────────────
 # st.html 로 렌더링한다 (st.markdown 은 빈 줄에서 HTML 블록이 끊겨 태그가 노출됨).
-
 STEPS = ("① 스키마로 프롬프트 구성", "② 선택한 데이터에 대해 실행", "③ 노이즈 주입 후 반환")
 
 _TOK = re.compile(
@@ -1051,7 +1224,6 @@ _TOK = re.compile(
     r"None|True|False|lambda|with|try|except)\b)"
     r"|(?P<nu>\b\d+(?:\.\d+)?\b)"
 )
-
 
 def _hl(line: str) -> str:
     """한 줄을 escape + 간단한 하이라이트."""
@@ -1086,7 +1258,6 @@ def _fmt_num(v: float) -> str:
 
 
 _FLOAT = re.compile(r"-?\d+\.\d+(?:[eE][-+]?\d+)?")
-
 
 def fmt_answer(ans) -> str:
     """응답값 표시용 — 소수점 최대 5자리 (끝자리 0 제거, 천 단위 콤마).
@@ -1138,9 +1309,7 @@ def agent_error(msg: str) -> str:
 
 # ── 채팅 히스토리 카드 ──────────────────────────────────
 # 콘솔의 응답 카드와 같은 부품(code_block · fmt_answer · .ares · .epsb)을 재사용한다.
-
 _FAIL_PREFIX = re.compile(r"^\[(?:blocked|error)\]\s*")
-
 
 def history_card(when: str, question: str, code: str, ans: str, *,
                  ok: bool, eps: float, label: str = "결과") -> str:
@@ -1210,3 +1379,30 @@ def budget_meter(spent: float, total: float, remain: int, *, size: int = 64) -> 
         f'{arc}</svg><span class="bm-pct">{ratio * 100:.0f}%</span></div>'
         '</div>'
     )
+
+
+# ── 표 페이지 나누기 (history · budget_admin 공용) ───────────
+def pager(total: int, size: int, key: str, reset_on=None) -> tuple[int, int]:
+    """(start, end) 슬라이스 범위를 돌려준다.
+
+    번호 버튼은 호출한 자리에 그려지므로, 표는 미리 잡아 둔 자리(slot)에 나중에 그린다.
+    reset_on (데이터셋·필터 등) 값이 바뀌면 1페이지로 돌아간다. 1페이지뿐이면 버튼을 숨긴다.
+    """
+    pages = max(1, math.ceil(total / size))
+    sig = f"_{key}_sig"
+    if st.session_state.get(sig) != reset_on:          # 범위가 바뀌면 1페이지로
+        st.session_state[sig] = reset_on
+        st.session_state.pop(key, None)
+    cur = st.session_state.get(key)
+    if isinstance(cur, int) and cur > pages:           # 지워져서 페이지 수가 줄어든 경우
+        st.session_state[key] = pages
+
+    page = 1
+    if pages > 1:
+        with st.container(horizontal=True, horizontal_alignment="center", key=f"{key}_wrap"):
+            if hasattr(st, "pagination"):
+                page = st.pagination(pages, max_visible_pages=7, key=key)
+            else:
+                st.caption("페이지 버튼은 최신 Streamlit 에서 표시됩니다 — pip install -U streamlit")
+    start = (page - 1) * size
+    return start, min(start + size, total)
