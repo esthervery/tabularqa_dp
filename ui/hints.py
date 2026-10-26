@@ -9,11 +9,6 @@
     화면 렌더 경로에서 parquet 을 읽지 않기 위해서다. 카드 1장을 그리려고
     수만 행짜리 parquet 을 매 rerun 마다 여는 것은 낭비이고, Streamlit 은
     rerun 마다 스크립트를 처음부터 다시 실행한다.
-
-값 노출 규칙 (프라이버시)
-    범주형   → 값 종류(이름)만. 건수·비율은 수집만 하고 화면에 내보내지 않는다.
-    수치형   → Q1·Q2·Q3 만. 최소·최대·평균·표준편차·분포 금지.
-    측정 대상 → 힌트 밴드에 표시하지 않는다 (결과의 대상이므로).
 """
 from __future__ import annotations
 
@@ -41,7 +36,7 @@ def load() -> dict:
 
 
 def cards_of(db_name: str, bucket: str = "all") -> list[dict]:
-    """카드 순서: 조건(cat) → 수치형(filter) → 이진(pattern)."""
+    """카드 순서: 이진(pattern) → 수치 조건(filter) → 범주형(cat)."""
     p = load().get(db_name) or {}
     cat = p.get("cat") or []
     fil = p.get("fil") or []
@@ -54,18 +49,18 @@ def cards_of(db_name: str, bucket: str = "all") -> list[dict]:
         return pat
 
     out: list[dict] = []
-    for f in cat:
-        out.append({"col": f["col"], "label": f["label"], "kind": "categorical",
-                    "n": f.get("kinds", 0),
-                    "values": _values(db_name, f["col"], f.get("ordered", False))})
-    for f in fil:
-        out.append({"col": f["col"], "label": f["label"], "kind": "filter",
-                    "unit": f.get("unit", ""), "n": f.get("kinds", 0),
-                    "quartiles": f.get("q", [])})
     for f in pat:
         out.append({"col": f["col"], "label": f["label"], "kind": "pattern",
                     "n": f.get("kinds", 2),
                     "values": _values(db_name, f["col"], False)})
+    for f in fil:
+        out.append({"col": f["col"], "label": f["label"], "kind": "filter",
+                    "unit": f.get("unit", ""), "n": f.get("kinds", 0),
+                    "quartiles": f.get("q", [])})
+    for f in cat:
+        out.append({"col": f["col"], "label": f["label"], "kind": "categorical",
+                    "n": f.get("kinds", 0),
+                    "values": _values(db_name, f["col"], f.get("ordered", False))})
     return out
 
 

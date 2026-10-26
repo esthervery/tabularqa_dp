@@ -157,7 +157,7 @@ def _ds_picker() -> None:
     pick = st.selectbox(
         f"dataset_{DS_MODE}",                # 라벨을 모드별로 달리해 위젯 상태를 분리
         opts, index=opts.index(now), format_func=_ds_label,
-        label_visibility="collapsed", width=340,
+        label_visibility="collapsed", width="stretch",   # 폭은 CSS 에서 150~340px 로 제한
     )
     if pick == now:
         return
@@ -177,11 +177,14 @@ def _ds_picker() -> None:
 
 
 # ══ 상단 바 ════════════════════════════════════════════
-# 왼쪽: 브랜드 + 탭 / 오른쪽: 데이터셋 선택 + 계정 + 로그아웃
-top = st.columns([0.55, 0.45], vertical_alignment="center")
-with top[0]:
-    with st.container(horizontal=True, vertical_alignment="center",
-                      gap="small", key="navleft"):
+# 한 줄 고정(wrap=False) — 창이 좁아지면 줄바꿈 대신 선택칸부터 줄어든다.
+# 왼쪽 navleft: 브랜드 | 탭  /  오른쪽 navbar: 데이터셋 선택 | 계정 · 로그아웃
+with st.container(horizontal=True, wrap=False, vertical_alignment="center",
+                  gap="small", key="navtop"):
+
+    # 왼쪽 — 내용 폭만큼만 차지한다
+    with st.container(horizontal=True, wrap=False, vertical_alignment="center",
+                      gap="small", width="content", key="navleft"):
         st.html(
             '<div class="navbrand"><div class="mark">D</div>'
             '<div class="who"><b>DPilot</b><span>PRIVACY WORKSPACE</span></div></div>',
@@ -197,11 +200,11 @@ with top[0]:
                 st.session_state.nav_active = t
                 st.switch_page(pg_item)
 
-with top[1]:
-    bar = st.container(horizontal=True, horizontal_alignment="right",
-                       vertical_alignment="center", gap="small", key="navbar")
-    with bar:
-        _ds_picker()                                   # 프라이버시 분석에서는 자리를 비운다
+    st.space(98)
+    # 오른쪽 — 남은 폭 전부, 내용은 오른쪽 끝에 붙는다
+    with st.container(horizontal=True, wrap=False, horizontal_alignment="right",
+                      vertical_alignment="center", gap="small", key="navbar"):
+        _ds_picker()
         st.html('<div class="navsep"></div>', width="content")
         st.html(
             '<div class="navuser"><div class="av">'

@@ -331,6 +331,39 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 /* ── 상단 바 아래 가로 구분선 — Streamlit 기본 gap(1rem)을 일부 상쇄 ── */
 .stApp .navrule{height:1px;background:var(--bd);margin:-6px 0 -8px !important}
 
+/* ── 한 줄 고정 · 반응형 축소 (navtop) ── */
+.stApp .st-key-navtop{
+  flex-wrap:nowrap !important;
+  overflow-x:auto; overflow-y:hidden;      /* 아주 좁을 때만 가로 스크롤 */
+  scrollbar-width:none;
+}
+.stApp .st-key-navtop::-webkit-scrollbar{ display:none; }
+
+/* 왼쪽은 줄어들지 않음, 오른쪽이 남은 폭을 차지하며 줄어듦 */
+.stApp .st-key-navleft{ flex:0 0 auto !important; flex-wrap:nowrap !important; }
+.stApp .st-key-navbar{ flex:1 1 auto !important; min-width:0 !important; flex-wrap:nowrap !important; }
+.stApp .st-key-navbar > *{ flex-shrink:0; }
+
+/* 데이터셋 선택칸 — 150px ~ 340px 사이에서 늘고 줄어듦 */
+.stApp .st-key-navbar [data-testid="stElementContainer"]:has([data-baseweb="select"]){
+  flex:1 1 340px !important;
+  max-width:340px !important;
+  min-width:150px !important;
+}
+.stApp .st-key-navbar div[data-baseweb="select"] > div > div:first-child{
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;   /* 긴 이름은 … 처리 */
+}
+
+/* 단계별 축소 */
+@media (max-width:1180px){
+  .navbrand .who span{ display:none; }                           /* 부제 숨김 */
+  .stApp div[class*="st-key-nav_"] button{ padding:0 6px !important; }
+}
+@media (max-width:1020px){
+  .navuser .u{ display:none; }                                   /* 계정명 숨김, 아바타만 */
+  .stApp .navsep{ margin:0 2px !important; }
+}
+
 /* ── 페이지 파일 누락 경고 ── */
 .navwarn{border:1px solid var(--danline);background:var(--dansoft);color:var(--dan2);
   border-radius:10px;padding:10px 13px;font-size:12px;line-height:1.55;margin-top:8px}
