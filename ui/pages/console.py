@@ -171,10 +171,8 @@ def _band(cur: str) -> None:
 
     with st.container(key="cband"):
         # top 정렬 — 두 영역의 첫 줄(필드 힌트 / 통계 대상)이 같은 윗선에서 시작한다
-        left, right = st.columns([4.4, 1], gap="small", vertical_alignment="top")
+        left, right = st.columns([1, 4.4], gap="small", vertical_alignment="top")
         with left:
-            _band_body(cur)
-        with right:
             with st.container(key="cbright"):
                 # 제목 줄: 통계 대상(왼쪽) ↔ 예산 링크(오른쪽)
                 with st.container(horizontal=True, horizontal_alignment="distribute",
@@ -190,6 +188,8 @@ def _band(cur: str) -> None:
                     # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
                     st.markdown(design.budget_meter(spent, total, remain, size=84),
                                 unsafe_allow_html=True, width="stretch")
+        with right:
+            _band_body(cur)
 
 
 def _band_body(cur: str) -> None:

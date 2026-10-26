@@ -631,9 +631,9 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .bm-pct{font-size:12px;font-weight:700;color:var(--ink2)}
 
 /* 제목 줄: 두 요소 모두 22px 한 줄 상자로 통일 → 같은 높이에 놓인다 */
-.stApp .st-key-cbhead{ min-height:24px !important; align-items:center !important; gap:8px !important; }
+.stApp .st-key-cbhead{ min-height:22px !important; align-items:center !important; gap:8px !important; }
 .stApp .st-key-cbhead .mtarget{
-  margin:0 !important; line-height:24px !important;
+  margin:0 !important; line-height:22px !important;
   font-size:14px; color:var(--dim); white-space:nowrap;
 }
 .stApp .st-key-cbhead .mtarget b{ font-size:16px; font-weight:700; color:var(--ink); margin-left:5px; }
