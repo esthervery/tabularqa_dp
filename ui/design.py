@@ -538,6 +538,8 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 /* '자세히 보기' 버튼은 오른쪽 끝 정렬 */
 .stApp div[class*="st-key-det_"]{ display:flex; justify-content:flex-end; }
 
+
+
 /* ══ 콘솔 공간 확보 ═══════════════════════════════════ */
 /* 상단 바 — 브랜드·선택칸을 탭과 같은 36px 기준으로 */
 .stApp div.navbrand{ min-height:36px !important; }
@@ -570,39 +572,70 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 
 /* ── 콘솔 밴드: 왼쪽 필드 힌트 카드 / 오른쪽 ε 예산 카드 (각각 별도) ── */
 .stApp .st-key-cband{ margin:-10px 0 14px !important; }
+
 /* 필드 힌트는 원래 카드 모양 유지 — 바깥 여백만 제거 */
 .stApp .st-key-cband .band{ margin:0 !important; }
 
-/* (1) 두 컬럼 높이를 같게 — 도넛 카드 밑변 = 필드 힌트 밑변 */
-.stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
-.stApp .st-key-cband .band{ margin-bottom:0 !important; }     /* 힌트 카드 밑 여백 제거 */
-.stApp .st-key-cband [data-testid="stColumn"]{ padding-bottom:0 !important; }
 
-/* (2) 오른쪽 컬럼 → cbright → cbring 까지 남은 높이를 끝까지 채운다 */
-.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring){
-  display:flex !important; flex-direction:column !important;
-  align-self:stretch !important; height:auto !important;
+
+/* ── 콘솔 밴드: 왼쪽 필드 힌트 카드 / 오른쪽 ε 예산 카드 (각각 별도) ── */
+.stApp .st-key-cband{ margin:-10px 0 14px !important; }
+
+/* 필드 힌트는 원래 카드 모양 유지 — 바깥 여백만 제거 */
+.stApp .st-key-cband .band{ margin:0 !important; }
+
+/* ── 콘솔 밴드: 양쪽 카드가 같은 행 높이까지 늘어난다 ── */
+
+/* (1) 넘침·스크롤 방지 */
+.stApp .st-key-cband,
+.stApp .st-key-cbrow,
+.stApp .st-key-cbright,
+.stApp .st-key-cbhint,
+.stApp .st-key-cbring{
+  overflow:visible !important;
 }
-.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring) > *,
-.stApp .st-key-cband div:has(> .st-key-cbright){
-  flex:1 1 auto !important; height:100% !important;
-}
-/* 제목 줄(cbhead)에서 카드까지의 간격·여백 — 위 12px 은 필드 힌트 카드 안쪽 위 여백에 맞춘 값 */
+
+/* (2) 왼쪽: 제목 줄은 제 높이, 도넛 카드가 나머지를 채움 */
 .stApp .st-key-cbright{
-  height:100% !important;
   display:flex !important; flex-direction:column !important;
-  gap:10px !important;
-  padding:12px 2px 0 4px !important;   /* ← 아래 여백 0 이 밑변 일치의 핵심 */
+  padding:8px 2px 0 4px !important;    /* 첫 값 = 제목 줄 위 여백 · 셋째 값은 0 유지 */
+  gap:10px !important;                 /* 제목 줄 ↔ 도넛 카드 */
 }
+.stApp .st-key-cbright div:has(.st-key-cbring){
+  display:flex !important; flex-direction:column !important;
+  flex:1 1 auto !important; min-height:0 !important;
+}
+.stApp .st-key-cbring{
+  flex:1 1 auto !important;
+  height:auto !important;
+  box-sizing:border-box !important;
+}
+
+/* (3) 오른쪽: 필드 힌트 카드도 행 높이까지 늘어남 */
+.stApp .st-key-cbhint{
+  display:flex !important; flex-direction:column !important;
+}
+.stApp .st-key-cbhint div:has(.band){
+  display:flex !important; flex-direction:column !important;
+  flex:1 1 auto !important; min-height:0 !important;
+}
+.stApp .st-key-cbhint .band{
+  flex:1 1 auto !important;
+  margin:0 !important;
+  box-sizing:border-box !important;
+}
+
+
+
 .stApp .st-key-cbright > [data-testid="stElementContainer"]{ margin-bottom:0 !important; }
+
+
+
 /* cbright 자체는 투명 — 테두리는 cbring 에만 */
 .stApp .st-key-cbright > [data-testid="stVerticalBlock"]{ background:transparent !important; border:none !important; }
 
 /* (3) 카드 본체 — 흰 배경 + 테두리 (여기가 유일한 테두리 선언) */
 .stApp .st-key-cband .st-key-cbring{
-  flex:1 1 auto !important;
-  display:flex !important; flex-direction:column !important;
-  justify-content:center !important;        /* 수치·도넛을 카드 세로 가운데 */
   background:#fff !important;
   border:1px solid var(--bd) !important;
   border-radius:14px !important;            /* .band 와 같은 반경 */
@@ -657,6 +690,8 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 /* ── 상세 대화상자: 코드가 길면 가로 스크롤 대신 줄바꿈 ─────── */
 div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-all; }
 
+
+
 /* ══ 결재 항목 ══════════════════════════════════════════ */
 .decide{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
   padding-top:4px}
@@ -695,20 +730,6 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
     margin-bottom:0 !important;          /* 필드 힌트 카드 밑선 = 왼쪽 컬럼 바닥 */
 }
 
-/* (2) 오른쪽 컬럼 → cbright → cbring 까지 남은 높이를 끝까지 채움 */
-.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring){
-    display:flex !important;
-    flex-direction:column !important;
-}
-.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring) div:has(.st-key-cbring){
-    display:flex !important;
-    flex-direction:column !important;
-    flex:1 1 auto !important;
-}
-.stApp .st-key-cbright{
-    gap:8px !important;                  /* 제목 줄 ↔ 카드 간격 */
-}
-
 /* (3) 카드 본체 */
 .stApp .st-key-cbring{
     flex:1 1 auto !important;
@@ -732,6 +753,55 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
 }
 .stApp .st-key-cbring .bmeter .bm-val{ font-size:16px !important; }
 .stApp .st-key-cbring .bmeter > :first-child > :last-child{ font-size:11px !important; }
+
+/* ── 도넛 묶음: 카드 안 정중앙 + 도넛 왼쪽 / 텍스트 오른쪽(왼쪽 정렬) ── */
+
+/* (A) 카드 안 세로·가로 가운데 */
+.stApp .st-key-cbring{
+  justify-content:center !important;
+  align-items:stretch !important;
+  box-sizing:border-box !important;
+}
+/* markdown 이 만드는 중간 상자들의 기본 여백 제거 → 아래로 밀리는 원인 차단 */
+.stApp .st-key-cbring [data-testid="stElementContainer"],
+.stApp .st-key-cbring [data-testid="stMarkdown"],
+.stApp .st-key-cbring [data-testid="stMarkdownContainer"],
+.stApp .st-key-cbring [data-testid="stMarkdownContainer"] > div{
+  margin:0 !important; padding:0 !important;
+}
+
+/* (B) 배치: 도넛(앞) → 텍스트(뒤) */
+.stApp .st-key-cbring .bmeter{
+  display:flex !important;
+  justify-content:center !important;   /* 묶음 전체를 카드 가로 가운데 */
+  align-items:flex-end !important;     /* 텍스트 밑줄 ↔ 도넛 아래쪽 맞춤 */
+  gap:16px !important;                 /* 도넛 ↔ 텍스트 간격 */
+  margin:0 !important; padding:0 !important;
+}
+.stApp .st-key-cbring .bmeter > :last-child{ order:1 !important; }   /* 도넛 → 왼쪽 */
+.stApp .st-key-cbring .bmeter > :first-child{                       /* 텍스트 → 오른쪽 */
+  order:2 !important;
+  text-align:left !important;
+  align-items:flex-start !important;
+  margin:0 !important;
+  padding-bottom:6px !important;       /* 텍스트 높이 */
+}
+
+
+
+
+
+
+/* ── 필드 힌트: st.markdown 의 음수 아래 여백 제거 → 카드 실제 높이로 행 높이 계산 ── */
+.stApp .st-key-cbhint [data-testid="stElementContainer"],
+.stApp .st-key-cbhint [data-testid="stMarkdown"],
+.stApp .st-key-cbhint [data-testid="stMarkdownContainer"],
+.stApp .st-key-cbhint [data-testid="stMarkdownContainer"] > div{
+  margin:0 !important;
+}
+.stApp .st-key-cbhint div:has(.band){ min-height:auto !important; }
+
+
 
 /* 이전 버전 호환용 (본문 topbar 는 더 이상 그리지 않음) */
 .topbar{display:none}
@@ -811,10 +881,10 @@ def login_hero() -> str:
     <div><b>DPilot</b><span>Differential Privacy Workspace</span></div>
   </div>
   <h2>안전한 경계 안에서<br/>데이터에게 질문하기</h2>
-  <p class="lead">분석가는 원본 데이터에 직접 접근하지 않고, LLM 에이전트가 작성·실행한
+  <p class="lead">분석가는 원본 데이터에 직접 접근하지 않고, 에이전트가 실행한
   코드의 결과만 차분 프라이버시 보호 아래 받아봅니다.</p>
   <div class="bl"><div class="n">1</div><div class="t"><b>자연어 질의</b>
-    <span>프라이버시상 안전한 필드 힌트만 보고 통계량을 질문합니다.</span></div></div>
+    <span>프라이버시적으로 안전한 필드 정보를 통해 통계량을 질문합니다.</span></div></div>
   <div class="bl"><div class="n">2</div><div class="t"><b>ε 예산 원장</b>
     <span>질의마다 소비된 ε 을 데이터셋별 리스크 정책과 함께 추적합니다.</span></div></div>
   <div class="bl"><div class="n">3</div><div class="t"><b>관리자 결재</b>

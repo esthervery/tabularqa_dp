@@ -153,7 +153,7 @@ def render() -> None:
 
 
 def _band(cur: str) -> None:
-    """한 장의 카드 — 왼쪽: 필드 힌트 / 세로선 / 오른쪽: 통계 대상 · ε 예산 도넛."""
+    """왼쪽: 통계 대상 · ε 예산 도넛 카드 / 오른쪽: 필드 힌트 카드."""
     total = float(st.session_state.get("total_epsilon") or 2.0)
     spent = state.spent_of(cur)
     eps = float(st.session_state.get("eps") or EPS)
@@ -161,7 +161,7 @@ def _band(cur: str) -> None:
 
     is_admin = bool(st.session_state.get("is_admin"))
     rel   = "ui/pages/budget_admin.py" if is_admin else "ui/pages/budget_request.py"
-    link  = "예산 관리 →" if is_admin else "예산 신청 →"
+    link  = "예산 관리" if is_admin else "예산 신청"
     title = "예산 관리"   if is_admin else "예산 신청"
     target = st.session_state.get("page_map", {}).get(rel)
 
@@ -169,11 +169,12 @@ def _band(cur: str) -> None:
     mlabel = (meta.get("measure", {}).get("label")
               or fields.SPECS[cur]["measure"]["label"])
 
-    with st.container(key="cband"):
-        # top 정렬 — 두 영역의 첫 줄(필드 힌트 / 통계 대상)이 같은 윗선에서 시작한다
-        left, right = st.columns([1, 4.4], gap="small", vertical_alignment="top")
-        with left:
-            with st.container(key="cbright"):
+    with st.container(key="cband"):                       # ← 바깥: 테두리 없음
+        # 가로 컨테이너 — distribute: 안의 요소가 모두 같은 행 높이로 늘어난다
+        with st.container(horizontal=True, vertical_alignment="distribute",
+                          gap="small", wrap=False, key="cbrow"):
+            # 왼쪽: 폭 고정 (높이는 CSS 가 행 높이에 맞춘다)
+            with st.container(key="cbright", width=250):  # ← height="stretch" 제거
                 # 제목 줄: 통계 대상(왼쪽) ↔ 예산 링크(오른쪽)
                 with st.container(horizontal=True, horizontal_alignment="distribute",
                                   vertical_alignment="center", key="cbhead"):
@@ -183,13 +184,15 @@ def _band(cur: str) -> None:
                                  disabled=target is None):
                         st.session_state.nav_active = title
                         st.switch_page(target)
-                # 수치 + 도넛 — 남은 높이의 세로 가운데
-                with st.container(key="cbring", border=True):
+                # 도넛 묶음 카드 — 남은 높이는 CSS(flex)로 채운다
+                with st.container(key="cbring", border=True,   # ← height="stretch" 제거
+                                  vertical_alignment="center"):
                     # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
                     st.markdown(design.budget_meter(spent, total, remain, size=84),
                                 unsafe_allow_html=True, width="stretch")
-        with right:
-            _band_body(cur)
+            # 오른쪽: 남은 폭 전부
+            with st.container(key="cbhint", width="stretch"):
+                _band_body(cur)
 
 
 def _band_body(cur: str) -> None:
