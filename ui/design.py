@@ -568,9 +568,109 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 /* ── 상단 바 왼쪽(브랜드 | 탭) 구분자 ── */
 .stApp div.st-key-navleft div.navsep{ height:18px; margin:0 6px !important; align-self:center; }
 
-/* ── 콘솔: 구분선↔필드 힌트(②) 좁게 / 필드 힌트↔대화(③) 넓게 ── */
+/* ── 콘솔 밴드: 왼쪽 필드 힌트 카드 / 오른쪽 ε 예산 카드 (각각 별도) ── */
 .stApp .st-key-cband{ margin:-10px 0 14px !important; }
+/* 필드 힌트는 원래 카드 모양 유지 — 바깥 여백만 제거 */
 .stApp .st-key-cband .band{ margin:0 !important; }
+
+/* 두 컬럼 높이를 같게 — 오른쪽 카드가 왼쪽 카드 높이만큼 늘어난다 */
+.stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
+
+/* '0.00 / 2.00 ε' 가 줄바꿈되지 않게 */
+.stApp .st-key-cband .bring{ margin:0 !important; }
+.stApp .st-key-cband .bring *{ white-space:nowrap; }
+
+/* ── 오른쪽 영역: 왼쪽 필드 힌트 카드와 같은 높이 · 틀은 완전히 없음 ── */
+.stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
+.stApp .st-key-cband [data-testid="stColumn"]:last-child{
+  align-self:stretch !important;
+  height:auto !important;
+  display:flex !important; flex-direction:column !important;
+}
+
+/* 컬럼 안의 모든 상자에서 배경·테두리·그림자 제거 (버튼·도넛 SVG 는 제외) */
+.stApp .st-key-cband [data-testid="stColumn"]:last-child,
+.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stVerticalBlock"],
+.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stVerticalBlockBorderWrapper"],
+.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stLayoutWrapper"],
+.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stElementContainer"],
+.stApp .st-key-cband .bring{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+}
+
+/* 컬럼 → cbright 까지 높이를 이어 준다 */
+.stApp .st-key-cband [data-testid="stColumn"]:last-child > *,
+.stApp .st-key-cband [data-testid="stColumn"]:last-child div:has(> .st-key-cbright){
+  flex:1 1 auto !important; height:100% !important;
+}
+
+/* cbright: 위 = 제목 줄 / 아래 = 남은 높이 전체 */
+.stApp .st-key-cbright{
+  height:100% !important;
+  display:flex !important; flex-direction:column !important;
+  gap:4px !important;
+  padding:12px 2px 12px 4px !important;   /* 위 12px = 필드 힌트 카드 안쪽 위 여백 */
+}
+/* cbring: 남은 높이를 다 차지하고, 수치·도넛을 그 안의 세로 가운데에 */
+.stApp .st-key-cbring{
+  flex:1 1 auto !important;
+  display:flex !important; flex-direction:column !important;
+  justify-content:center !important;
+}
+.stApp .st-key-cbring .bring{ margin:0 !important; padding:0 !important; }
+
+/* 제목 줄: 두 요소 모두 20px 한 줄 상자로 통일 → 같은 높이에 놓인다 */
+.stApp .st-key-cbhead{ min-height:20px !important; align-items:center !important; gap:8px !important; }
+.stApp .st-key-cbhead > div{ margin:0 !important; }
+.stApp .st-key-cbhead .mtarget{
+  margin:0 !important; line-height:20px !important;
+  font-size:12px; color:var(--dim); white-space:nowrap;
+}
+.stApp .st-key-cbhead .mtarget b{ font-size:13px; color:var(--ink); margin-left:4px; }
+
+/* 예산 링크: 버튼 기본 높이·여백 제거, 텍스트와 같은 20px 줄 */
+.stApp .st-key-to_budget,
+.stApp .st-key-to_budget .stButton{ margin:0 !important; display:flex; align-items:center; }
+.stApp .st-key-to_budget button{
+  height:20px !important; min-height:20px !important; padding:0 !important;
+  line-height:20px !important; display:flex !important; align-items:center !important;
+  border:none !important; background:transparent !important; box-shadow:none !important;
+}
+.stApp .st-key-to_budget button p{
+  margin:0 !important; line-height:20px !important;
+  font-size:12px !important; font-weight:600 !important; color:var(--pri) !important;
+  white-space:nowrap;
+}
+.stApp .st-key-to_budget button:hover p{ color:var(--pri2) !important; text-decoration:underline; }
+.stApp .st-key-to_budget button:disabled p{ color:var(--dim) !important; text-decoration:none; }
+
+/* 예산 수치 폰트: 고정폭 → Pretendard (숫자 폭은 고정) */
+.stApp .st-key-cband .bring,
+.stApp .st-key-cband .bring *{
+  font-family:'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.01em;
+}
+
+/* ── 상세 대화상자: 코드가 길면 가로 스크롤 대신 줄바꿈 ─────── */
+div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-all; }
+
+/* ══ 결재 항목 ══════════════════════════════════════════ */
+.decide{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+  padding-top:4px}
+.decide .h{font-size:14px;font-weight:600;color:var(--ink)}
+.decide .h code{font-size:12px}
+.decide .why{font-size:13px;color:var(--ink2);background:var(--wash);border:1px solid var(--bd2);
+  border-radius:9px;padding:9px 12px;margin-top:8px;line-height:1.55}
+.decide .id{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap}
+
+/* ── Streamlit 기본 헤더: 투명해도 클릭을 가로챈다 → 완전히 제거 ── */
+.stApp [data-testid="stHeader"]{
+  display:none !important;
+}
 
 /* ── 하단 고정 질의창(④): 배경·윗선·그림자로 '고정된 바' 느낌, 아래 여백 축소 ── */
 .stApp [data-testid="stBottom"]{
@@ -585,18 +685,6 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
   padding:12px 2.4rem 14px !important;
   max-width:1440px !important;
 }
-
-/* ── 상세 대화상자: 코드가 길면 가로 스크롤 대신 줄바꿈 ─────── */
-div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-all; }
-
-/* ══ 결재 항목 ══════════════════════════════════════════ */
-.decide{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
-  padding-top:4px}
-.decide .h{font-size:14px;font-weight:600;color:var(--ink)}
-.decide .h code{font-size:12px}
-.decide .why{font-size:13px;color:var(--ink2);background:var(--wash);border:1px solid var(--bd2);
-  border-radius:9px;padding:9px 12px;margin-top:8px;line-height:1.55}
-.decide .id{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap}
 
 /* 이전 버전 호환용 (본문 topbar 는 더 이상 그리지 않음) */
 .topbar{display:none}

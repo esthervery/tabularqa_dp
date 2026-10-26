@@ -153,35 +153,43 @@ def render() -> None:
 
 
 def _band(cur: str) -> None:
-    """왼쪽: 필드 힌트 / 오른쪽: ε 도넛 + 그 아래 예산 버튼. 데이터셋 선택은 상단 바."""
+    """한 장의 카드 — 왼쪽: 필드 힌트 / 세로선 / 오른쪽: 통계 대상 · ε 예산 도넛."""
     total = float(st.session_state.get("total_epsilon") or 2.0)
     spent = state.spent_of(cur)
     eps = float(st.session_state.get("eps") or EPS)
     remain = max(0, int((total - spent) / eps + 1e-9))
 
+    is_admin = bool(st.session_state.get("is_admin"))
+    rel   = "ui/pages/budget_admin.py" if is_admin else "ui/pages/budget_request.py"
+    link  = "예산 관리 →" if is_admin else "예산 신청 →"
+    title = "예산 관리"   if is_admin else "예산 신청"
+    target = st.session_state.get("page_map", {}).get(rel)
+
+    meta = hints.load().get(cur) or {}
+    mlabel = (meta.get("measure", {}).get("label")
+              or fields.SPECS[cur]["measure"]["label"])
+
     with st.container(key="cband"):
-        left, right = st.columns([4.2, 1], gap="medium", vertical_alignment="center")
+        # top 정렬 — 두 영역의 첫 줄(필드 힌트 / 통계 대상)이 같은 윗선에서 시작한다
+        left, right = st.columns([4.2, 1], gap="small", vertical_alignment="top")
         with left:
             _band_body(cur)
         with right:
-            # 기존 코드 그대로 ("통계 대상" 표시, 도넛, 예산 버튼)
-            meta = hints.load().get(cur) or {}
-            mlabel = (meta.get("measure", {}).get("label")
-                    or fields.SPECS[cur]["measure"]["label"])
-            st.html(f'<div class="mtarget">통계 대상 <b>{mlabel}</b></div>')
-            # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
-            st.markdown(design.budget_ring(spent, total, remain),
-                        unsafe_allow_html=True, width="stretch")
-
-
-        is_admin = bool(st.session_state.get("is_admin"))
-        rel   = "ui/pages/budget_admin.py" if is_admin else "ui/pages/budget_request.py"
-        label = "📊 예산 관리" if is_admin else "↓ 예산 신청"
-        title = "예산 관리"   if is_admin else "예산 신청"
-        target = st.session_state.get("page_map", {}).get(rel)
-        if st.button(label, key="to_budget", width="stretch", disabled=target is None):
-            st.session_state.nav_active = title
-            st.switch_page(target)
+            with st.container(key="cbright"):
+                # 제목 줄: 통계 대상(왼쪽) ↔ 예산 링크(오른쪽)
+                with st.container(horizontal=True, horizontal_alignment="distribute",
+                                  vertical_alignment="center", key="cbhead"):
+                    st.html(f'<div class="mtarget">통계 대상 <b>{mlabel}</b></div>',
+                            width="content")
+                    if st.button(link, key="to_budget", type="tertiary",
+                                 disabled=target is None):
+                        st.session_state.nav_active = title
+                        st.switch_page(target)
+                # 수치 + 도넛 — 남은 높이의 세로 가운데
+                with st.container(key="cbring"):
+                    # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
+                    st.markdown(design.budget_ring(spent, total, remain),
+                                unsafe_allow_html=True, width="stretch")
 
 
 def _band_body(cur: str) -> None:

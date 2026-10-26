@@ -131,8 +131,7 @@ design.inject()
 # key 를 쓰지 않고 index 로만 현재 값을 표현한다 (v17 버그 회피 — console.py 주석 참고).
 ALL_DS = "전체"
 CUR_TITLE = getattr(pg, "title", st.session_state.nav_active)
-DS_MODE = {"예산 관리": "admin", "프라이버시 분석": "none",
-           "채팅 히스토리": "hist"}.get(CUR_TITLE, "ds")
+DS_MODE = {"예산 관리": "admin", "채팅 히스토리": "hist"}.get(CUR_TITLE, "ds")
 
 
 def _ds_label(k: str) -> str:

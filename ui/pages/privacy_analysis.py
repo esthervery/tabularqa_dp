@@ -38,10 +38,10 @@ def _ensure_targets() -> None:
 
 def render() -> None:
     design.inject()
-    st.markdown(design.page_hero(
-        "프라이버시 분석",
-        "리스크 레벨별 95% 신뢰구간 폭 — 낮은 레벨일수록 프라이버시가 강하고 결과가 거칩니다."),
-        unsafe_allow_html=True)
+    # st.markdown(design.page_hero(
+    #     "프라이버시 분석",
+    #     "리스크 레벨별 95% 신뢰구간 폭 — 낮은 레벨일수록 프라이버시가 강하고 결과가 거칩니다."),
+    #     unsafe_allow_html=True)
 
     if dp_sim is None:
         st.markdown(design.warn("시뮬레이터를 불러오지 못했습니다 — scipy 설치가 필요합니다 "
@@ -49,33 +49,34 @@ def render() -> None:
         return
     _ensure_targets()
 
-    rows = []
-    errors = []
-    for name, spec in fields.SPECS.items():
-        if not spec.get("enabled"):
-            continue
-        widths, k = {}, None
-        for r in RISKS:
-            try:
-                res = dp_sim.simulate(name, r)
-                widths[r] = float(res.stop_ci_hi - res.stop_ci_lo)
-                k = int(res.k)
-            except Exception as e:
-                errors.append(f"{name} · Risk {r}: {type(e).__name__}: {e}")
-        if widths:
-            rows.append({"name": name, "title": spec["title"], "widths": widths,
-                         "k": k, "measure": spec["measure"]})
+    # 분석 대상 = 상단 바에서 고른 데이터셋 하나 ('전체' 없음)
+    name = st.session_state.get("db_name")
+    spec = fields.SPECS.get(name) or {}
+    if not spec.get("enabled"):
+        st.markdown(design.empty("분석할 데이터셋을 상단에서 선택하세요"), unsafe_allow_html=True)
+        return
+
+    widths, k, errors = {}, None, []
+    for r in RISKS:
+        try:
+            res = dp_sim.simulate(name, r)
+            widths[r] = float(res.stop_ci_hi - res.stop_ci_lo)
+            k = int(res.k)
+        except Exception as e:
+            errors.append(f"Risk {r}: {type(e).__name__}: {e}")
 
     if errors:
         st.markdown(design.warn("일부 시뮬레이션을 계산하지 못했습니다 — " + "; ".join(errors[:3])),
                     unsafe_allow_html=True)
 
-    if not rows:
-        st.markdown(design.empty("시뮬레이션할 데이터셋이 없습니다"), unsafe_allow_html=True)
+    if not widths:
+        st.markdown(design.empty("이 데이터셋의 시뮬레이션 결과가 없습니다"), unsafe_allow_html=True)
         return
 
-    _matrix(rows)
-    _confirm(rows)
+    row = {"name": name, "title": spec["title"], "widths": widths,
+           "k": k, "measure": spec["measure"]}
+    _matrix([row])      # 표 함수는 그대로 — 행이 1개만 들어간다
+    _confirm(row)
 
 
 # ── 매트릭스 ────────────────────────────────────────────
@@ -123,27 +124,23 @@ def _cell(v: float | None, wmax: float) -> str:
 
 
 # ── 정책 확정 ───────────────────────────────────────────
-
-def _confirm(rows: list[dict]) -> None:
+def _confirm(row: dict) -> None:
     admin = st.session_state.get("username") or "admin"
-    names = [r["name"] for r in rows]
+    ds = row["name"]
 
     with st.container(border=True, key="card_confirm"):
         st.markdown(design.card_head(
             "데이터셋 기본 정책 확정",
-            "확정된 정책은 개인 오버라이드가 없는 모든 분석가에게 적용됩니다."),
+            f"대상: {row['title']} · {ds} — 확정된 정책은 개인 오버라이드가 없는 모든 분석가에게 적용됩니다."),
             unsafe_allow_html=True)
 
-        c1, c2, c3, c4 = st.columns([1.5, 1.1, 1.6, 0.8], vertical_alignment="bottom")
+        c1, c2, c3 = st.columns([1.1, 2.2, 0.8], vertical_alignment="bottom")
         with c1:
-            ds = st.selectbox("데이터셋", names, key="pol_ds",
-                              format_func=lambda k: f"{next(r['title'] for r in rows if r['name'] == k)} · {k}")
-        with c2:
             lv = st.selectbox("리스크", RISKS, index=2, key="pol_lv",
                               format_func=lambda x: f"Risk {x} ({db.RISK_TO_EPSILON[x]:.0f} ε)")
-        with c3:
+        with c2:
             note = st.text_input("메모", key="pol_note", placeholder="확정 근거 (선택)")
-        with c4:
+        with c3:
             if st.button("확정", type="primary", key="pol_ok", use_container_width=True):
                 try:
                     db.confirm_policy(admin, ds, int(lv), note or None)
@@ -151,22 +148,24 @@ def _confirm(rows: list[dict]) -> None:
                 except Exception as e:
                     st.error(f"확정하지 못했습니다 ({type(e).__name__}: {e})")
 
-        hist = db.policy_history(limit=8)
-        if hist:
-            st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
-            grid = "grid-template-columns:100px 1fr 120px 1.4fr"
-            out = [f'<div class="trow head" style="{grid}"><span>확정</span><span>데이터셋</span>'
-                   '<span>리스크</span><span>메모</span></div>']
-            for h in hist:
-                risk_badge = design.pill("Risk " + str(h["risk_level"]), "primary")
-                out.append(
-                    f'<div class="trow" style="{grid}">'
-                    f'<span class="t">{_t(h.get("confirmed_at"))}</span>'
-                    f'<span class="m">{h["db_name"]}</span>'
-                    f'<span>{risk_badge}</span>'
-                    f'<span class="x">{_esc(h.get("note") or "-")}</span></div>'
-                )
-            st.markdown("".join(out), unsafe_allow_html=True)
+        # 이 데이터셋의 확정 이력만 (최근 8건)
+        hist = [h for h in db.policy_history(limit=50) if h.get("db_name") == ds][:8]
+        st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
+        if not hist:
+            st.markdown(design.empty("이 데이터셋의 확정 이력이 없습니다"), unsafe_allow_html=True)
+            return
+        grid = "grid-template-columns:100px 120px 1fr"
+        out = [f'<div class="trow head" style="{grid}"><span>확정</span>'
+               '<span>리스크</span><span>메모</span></div>']
+        for h in hist:
+            risk_badge = design.pill("Risk " + str(h["risk_level"]), "primary")
+            out.append(
+                f'<div class="trow" style="{grid}">'
+                f'<span class="t">{_t(h.get("confirmed_at"))}</span>'
+                f'<span>{risk_badge}</span>'
+                f'<span class="x">{_esc(h.get("note") or "-")}</span></div>'
+            )
+        st.markdown("".join(out), unsafe_allow_html=True)
 
 
 def _t(v) -> str:
