@@ -26,7 +26,7 @@ def render() -> None:
     ds_now = st.session_state.get("adm_ds", "전체")
     st.markdown(design.page_hero(
         "예산 관리",
-        f"분석가의 리스크 상향 신청을 검토하고 승인 · 조정 · 거절합니다 — "
+        f"분석가의 Utility 상향 신청을 검토하고 승인 · 조정 · 거절합니다 — "
         f"대상: {'전체 데이터셋' if ds_now == '전체' else ds_now}"),
         unsafe_allow_html=True)
 
@@ -81,7 +81,7 @@ def render() -> None:
                     f'<span class="m">{_esc(r.get("username"))}</span>'
                     f'<span class="m">{r.get("db_name")}</span>'
                     f'<span class="x">{_esc(r.get("reason") or "")}</span>'
-                    f'<span class="m">Risk {r.get("current_level")} → '
+                    f'<span class="m">Utility {r.get("current_level")} → '
                     f'{r.get("approved_level") or r.get("requested_level")}</span>'
                     f'<span class="r">{design.status_pill(r.get("status"))}</span></div>'
                 )
@@ -98,7 +98,7 @@ def _decide_row(r: dict, admin: str) -> None:
     st.markdown(
         '<div class="decide"><div class="grow">'
         f'<div class="h">{_esc(r["username"])} · <code>{r["db_name"]}</code> · '
-        f'Risk {cur_lv} → {req_lv} {req_badge}</div>'
+        f'Utility {cur_lv} → {req_lv} {req_badge}</div>'
         f'<div class="why">{_esc(r.get("reason") or "")}</div></div>'
         f'<span class="id">#{rid} · {_t(r.get("created_at"))}</span></div>',
         unsafe_allow_html=True)
@@ -107,7 +107,7 @@ def _decide_row(r: dict, admin: str) -> None:
     with c1:
         lv = st.selectbox("승인 레벨", options,
                           index=options.index(req_lv) if req_lv in options else 0,
-                          format_func=lambda x: f"Risk {x} ({db.RISK_TO_EPSILON[x]:.0f} ε)",
+                          format_func=lambda x: f"Utility {x} ({db.RISK_TO_EPSILON[x]:.0f} ε)",
                           key=f"lv_{rid}")
     with c2:
         note = st.text_input("메모", key=f"note_{rid}", placeholder="승인 사유·조정 근거 (선택)")
@@ -129,7 +129,7 @@ def _apply(rid: int, admin: str, lv: int | None, note: str,
             status = "approved" if lv == req_lv else "partial"
             requests.decide(rid, reviewer=admin, status=status,
                             approved_level=lv, note=note)
-            st.toast(f"신청 #{rid} 을 Risk {lv} 로 "
+            st.toast(f"신청 #{rid} 을 Utility {lv} 로 "
                      f"{'승인' if status == 'approved' else '조정 승인'}했습니다.")
         st.rerun()
     except Exception as e:

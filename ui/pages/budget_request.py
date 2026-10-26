@@ -67,7 +67,7 @@ def render() -> None:
 
         with left:
             st.markdown(design.line([
-                ("현재 정책", f"Risk {risk}"),
+                ("현재 정책", f"Utility {risk}"),
                 ("총 ε", f"{total:.2f}"),
                 ("정책 출처", src or "-"),
             ]), unsafe_allow_html=True)
@@ -80,17 +80,17 @@ def render() -> None:
         # ── 상향 요청 ──
         options = [r for r in sorted(RISK_EPS) if r > risk]
         if not options:
-            st.markdown(design.empty("이미 최고 리스크 레벨(Risk 5)입니다 — 추가 상향이 없습니다"),
+            st.markdown(design.empty("이미 최고 Utility 레벨(Utility 5)입니다 — 추가 상향이 없습니다"),
                         unsafe_allow_html=True)
         else:
             st.markdown(design.card_head(
-                "리스크 상향 요청",
-                f"Risk {risk} 보다 높은 단계만 선택할 수 있습니다."),
+                "Utility 상향 요청",
+                f"Utility {risk} 보다 높은 단계만 선택할 수 있습니다."),
                 unsafe_allow_html=True)
 
             chosen = st.radio(
                 "요청 레벨", options, index=0, horizontal=True,
-                format_func=lambda r: f"Risk {r} · 총 ε {RISK_EPS[r]:.0f}",
+                format_func=lambda r: f"Utility {r} · 총 ε {RISK_EPS[r]:.0f}",
                 label_visibility="collapsed", key="req_level",
             )
             reason = st.text_area(
@@ -107,9 +107,9 @@ def render() -> None:
                 else:
                     try:
                         rid = requests.create(user, pick, risk, int(chosen), reason)
-                        st.success(f"신청 #{rid} 을 접수했습니다 — Risk {risk} → {chosen}. "
+                        st.success(f"신청 #{rid} 을 접수했습니다 — Utility {risk} → {chosen}. "
                                    f"관리자 승인 후 콘솔에 반영됩니다.")
-                        state.log("request", f"{pick} Risk {risk}→{chosen} 신청 #{rid}")
+                        state.log("request", f"{pick} Utility {risk}→{chosen} 신청 #{rid}")
                     except Exception as e:
                         st.error(f"신청을 접수하지 못했습니다 ({type(e).__name__}: {e})")
 
@@ -134,7 +134,7 @@ def _history(user: str) -> None:
                 f'<div class="trow" style="{grid}">'
                 f'<span class="t">{_t(r.get("created_at"))}</span>'
                 f'<span class="m">{r.get("db_name")}</span>'
-                f'<span class="m">Risk {r.get("current_level")} → {r.get("requested_level")}</span>'
+                f'<span class="m">Utility {r.get("current_level")} → {r.get("requested_level")}</span>'
                 f'<span class="x">{_esc(r.get("reason") or "")}</span>'
                 f'<span class="r">{design.status_pill(r.get("status"))}</span></div>'
             )

@@ -63,7 +63,7 @@ def render() -> None:
             widths[r] = float(res.stop_ci_hi - res.stop_ci_lo)
             k = int(res.k)
         except Exception as e:
-            errors.append(f"Risk {r}: {type(e).__name__}: {e}")
+            errors.append(f"Utility {r}: {type(e).__name__}: {e}")
 
     if errors:
         st.markdown(design.warn("일부 시뮬레이션을 계산하지 못했습니다 — " + "; ".join(errors[:3])),
@@ -88,7 +88,7 @@ def _matrix(rows: list[dict]) -> None:
     grid = "grid-template-columns:1.6fr repeat(5,1fr) 80px"
 
     head = (f'<div class="trow head" style="{grid}"><span>데이터셋</span>'
-            + "".join(f'<span class="r">Risk {r} · ε{db.RISK_TO_EPSILON[r]:.0f}</span>'
+            + "".join(f'<span class="r">Utility {r} · ε{db.RISK_TO_EPSILON[r]:.0f}</span>'
                       for r in RISKS)
             + '<span class="r">축소</span></div>')
 
@@ -108,9 +108,9 @@ def _matrix(rows: list[dict]) -> None:
 
     with st.container(border=True, key="card_matrix"):
         st.markdown(design.card_head(
-            "리스크별 최종 95% CI 폭",
+            "Utility별 최종 95% CI 폭",
             "각 셀 = 시뮬레이션 마지막 라운드의 신뢰구간 폭 (작을수록 정밀) · "
-            "축소 = Risk 1 대비 Risk 5 의 폭 축소 배율"),
+            "축소 = Utility 1 대비 Utility 5 의 폭 축소 배율"),
             unsafe_allow_html=True)
         st.markdown(head + "".join(body), unsafe_allow_html=True)
 
@@ -136,15 +136,15 @@ def _confirm(row: dict) -> None:
 
         c1, c2, c3 = st.columns([1.1, 2.2, 0.8], vertical_alignment="bottom")
         with c1:
-            lv = st.selectbox("리스크", RISKS, index=2, key="pol_lv",
-                              format_func=lambda x: f"Risk {x} ({db.RISK_TO_EPSILON[x]:.0f} ε)")
+            lv = st.selectbox("Utility", RISKS, index=2, key="pol_lv",
+                              format_func=lambda x: f"Utility {x} ({db.RISK_TO_EPSILON[x]:.0f} ε)")
         with c2:
             note = st.text_input("메모", key="pol_note", placeholder="확정 근거 (선택)")
         with c3:
             if st.button("확정", type="primary", key="pol_ok", use_container_width=True):
                 try:
                     db.confirm_policy(admin, ds, int(lv), note or None)
-                    st.success(f"{ds} 기본 정책을 Risk {lv} 로 확정했습니다.")
+                    st.success(f"{ds} 기본 정책을 Utility {lv} 로 확정했습니다.")
                 except Exception as e:
                     st.error(f"확정하지 못했습니다 ({type(e).__name__}: {e})")
 
@@ -156,9 +156,9 @@ def _confirm(row: dict) -> None:
             return
         grid = "grid-template-columns:100px 120px 1fr"
         out = [f'<div class="trow head" style="{grid}"><span>확정</span>'
-               '<span>리스크</span><span>메모</span></div>']
+               '<span>Utility</span><span>메모</span></div>']
         for h in hist:
-            risk_badge = design.pill("Risk " + str(h["risk_level"]), "primary")
+            risk_badge = design.pill("Utility " + str(h["risk_level"]), "primary")
             out.append(
                 f'<div class="trow" style="{grid}">'
                 f'<span class="t">{_t(h.get("confirmed_at"))}</span>'
