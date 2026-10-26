@@ -186,7 +186,7 @@ def _band(cur: str) -> None:
                         st.session_state.nav_active = title
                         st.switch_page(target)
                 # 수치 + 도넛 — 남은 높이의 세로 가운데
-                with st.container(key="cbring"):
+                with st.container(key="cbring", border=True):
                     # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
                     st.markdown(design.budget_meter(spent, total, remain, size=84),
                                 unsafe_allow_html=True, width="stretch")

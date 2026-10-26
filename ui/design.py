@@ -573,53 +573,51 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 /* 필드 힌트는 원래 카드 모양 유지 — 바깥 여백만 제거 */
 .stApp .st-key-cband .band{ margin:0 !important; }
 
-/* 두 컬럼 높이를 같게 — 오른쪽 카드가 왼쪽 카드 높이만큼 늘어난다 */
+/* (1) 두 컬럼 높이를 같게 — 도넛 카드 밑변 = 필드 힌트 밑변 */
 .stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
+.stApp .st-key-cband .band{ margin-bottom:0 !important; }     /* 힌트 카드 밑 여백 제거 */
+.stApp .st-key-cband [data-testid="stColumn"]{ padding-bottom:0 !important; }
 
-
-
-/* ── 오른쪽 영역: 왼쪽 필드 힌트 카드와 같은 높이 · 틀은 완전히 없음 ── */
-.stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
-.stApp .st-key-cband [data-testid="stColumn"]:last-child{
-  align-self:stretch !important;
-  height:auto !important;
+/* (2) 오른쪽 컬럼 → cbright → cbring 까지 남은 높이를 끝까지 채운다 */
+.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring){
   display:flex !important; flex-direction:column !important;
+  align-self:stretch !important; height:auto !important;
 }
-
-/* 컬럼 안의 모든 상자에서 배경·테두리·그림자 제거 (버튼·도넛 SVG 는 제외) */
-.stApp .st-key-cband [data-testid="stColumn"]:last-child,
-.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stVerticalBlock"],
-.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stVerticalBlockBorderWrapper"],
-.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stLayoutWrapper"],
-.stApp .st-key-cband [data-testid="stColumn"]:last-child [data-testid="stElementContainer"],
-.stApp .st-key-cband .bring{
-  background:transparent !important;
-  border:none !important;
-  box-shadow:none !important;
-  outline:none !important;
-}
-
-/* 컬럼 → cbright 까지 높이를 이어 준다 */
-.stApp .st-key-cband [data-testid="stColumn"]:last-child > *,
-.stApp .st-key-cband [data-testid="stColumn"]:last-child div:has(> .st-key-cbright){
+.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring) > *,
+.stApp .st-key-cband div:has(> .st-key-cbright){
   flex:1 1 auto !important; height:100% !important;
 }
-
-/* cbright: 위 = 제목 줄 / 아래 = 남은 높이 전체 */
+/* 제목 줄(cbhead)에서 카드까지의 간격·여백 — 위 12px 은 필드 힌트 카드 안쪽 위 여백에 맞춘 값 */
 .stApp .st-key-cbright{
   height:100% !important;
   display:flex !important; flex-direction:column !important;
-  gap:4px !important;
-  padding:12px 2px 12px 4px !important;   /* 위 12px = 필드 힌트 카드 안쪽 위 여백 */
+  gap:10px !important;
+  padding:12px 2px 0 4px !important;   /* ← 아래 여백 0 이 밑변 일치의 핵심 */
 }
-/* cbring: 남은 높이를 다 차지하고, 수치·도넛을 그 안의 세로 가운데에 */
-.stApp .st-key-cbring{
+.stApp .st-key-cbright > [data-testid="stElementContainer"]{ margin-bottom:0 !important; }
+/* cbright 자체는 투명 — 테두리는 cbring 에만 */
+.stApp .st-key-cbright > [data-testid="stVerticalBlock"]{ background:transparent !important; border:none !important; }
+
+/* (3) 카드 본체 — 흰 배경 + 테두리 (여기가 유일한 테두리 선언) */
+.stApp .st-key-cband .st-key-cbring{
   flex:1 1 auto !important;
   display:flex !important; flex-direction:column !important;
-  justify-content:center !important;
-  padding-top:24px !important;   /* ← 추가: 숫자·도넛을 아래로 */
+  justify-content:center !important;        /* 수치·도넛을 카드 세로 가운데 */
+  background:#fff !important;
+  border:1px solid var(--bd) !important;
+  border-radius:14px !important;            /* .band 와 같은 반경 */
+  box-shadow:none !important;
+  padding:14px 16px !important;
 }
 .stApp .st-key-cbring .bring{ margin:0 !important; padding:0 !important; }
+
+/* (4) 카드 안 배치 */
+.stApp .st-key-cbring .bmeter{
+  justify-content:center !important; gap:18px !important; padding-right:0 !important;
+}
+.stApp .st-key-cbring .bmeter > :first-child{ padding-bottom:4px !important; margin-right:0 !important; }
+.stApp .st-key-cbring .bmeter .bm-val{ font-size:16px !important; }
+.stApp .st-key-cbring .bmeter > :first-child > :last-child{ font-size:11px !important; }
 
 /* ── 콘솔 ε 예산 미터: 수치는 도넛 바로 왼쪽, 아랫선 기준 ── */
 .bmeter{display:flex;align-items:flex-end;justify-content:flex-end;gap:12px;width:100%}
