@@ -159,13 +159,19 @@ def _band(cur: str) -> None:
     eps = float(st.session_state.get("eps") or EPS)
     remain = max(0, int((total - spent) / eps + 1e-9))
 
-    left, right = st.columns([4.2, 1], gap="medium", vertical_alignment="center")
-    with left:
-        _band_body(cur)
-    with right:
-        # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
-        st.markdown(design.budget_ring(spent, total, remain),
-                    unsafe_allow_html=True, width="stretch")
+    with st.container(key="cband"):
+        left, right = st.columns([4.2, 1], gap="medium", vertical_alignment="center")
+        with left:
+            _band_body(cur)
+        with right:
+            # 기존 코드 그대로 ("통계 대상" 표시, 도넛, 예산 버튼)
+            meta = hints.load().get(cur) or {}
+            mlabel = (meta.get("measure", {}).get("label")
+                    or fields.SPECS[cur]["measure"]["label"])
+            st.html(f'<div class="mtarget">통계 대상 <b>{mlabel}</b></div>')
+            # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
+            st.markdown(design.budget_ring(spent, total, remain),
+                        unsafe_allow_html=True, width="stretch")
 
 
         is_admin = bool(st.session_state.get("is_admin"))
@@ -184,7 +190,7 @@ def _band_body(cur: str) -> None:
     if not cards:
         return
     meta = hints.load().get(cur) or {}
-    sub = f"노출 {len(cards)}필드 · 측정 대상 {meta.get('measure', {}).get('label', '')}"
+    sub = f"노출 {len(cards)}필드"
     st.markdown(design.band("필드 힌트", sub, [design.field_card(f) for f in cards]),
                 unsafe_allow_html=True)
 
@@ -255,10 +261,10 @@ def _suggestions(cur: str) -> None:
 
 
 def _composer(cur: str) -> None:
-    """입력줄 — 하단 고정(st.chat_input) 대신 본문 흐름 안의 폼.
+    """입력줄 — st.bottom(공식 하단 고정 영역)에 폼을 둔다.
 
-    chat_input 은 화면 하단에 떠 있어 아래 대화를 덮었다(겹침의 원인).
-    폼은 본문 흐름에 놓이므로 어떤 요소와도 겹치지 않는다.
+    st.bottom 은 Streamlit 이 관리하는 영역이라 직접 만든 fixed 오버레이와 다르다.
+    단, 질의 처리(_answer)는 본문에서 호출해야 '작성 중' 카드가 대화 흐름 안에 뜬다.
     """
     spec = fields.SPECS.get(cur, {})
     pat = (spec.get("pat") or [{}])[0]
@@ -270,16 +276,16 @@ def _composer(cur: str) -> None:
     if q:
         _answer(cur, q)
 
-    st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
-    with st.form("composer", clear_on_submit=True, border=False):
-        c1, c2 = st.columns([1, 0.13], vertical_alignment="bottom")
-        with c1:
-            typed = st.text_input("질의", value="", placeholder=ph,
-                                  label_visibility="collapsed", key="q_input")
-        with c2:
-            sent = st.form_submit_button("질의", type="primary",
-                                         use_container_width=True)
-    if sent:
+    with st.bottom:                                   # ← 폼만 하단 고정 영역으로
+        with st.form("composer", clear_on_submit=True, border=False):
+            c1, c2 = st.columns([1, 0.13], vertical_alignment="bottom")
+            with c1:
+                typed = st.text_input("질의", value="", placeholder=ph,
+                                      label_visibility="collapsed", key="q_input")
+            with c2:
+                sent = st.form_submit_button("질의", type="primary",
+                                             use_container_width=True)
+    if sent:                                          # ← 처리는 본문에서
         text = (typed or "").strip()
         if text:
             _answer(cur, text)

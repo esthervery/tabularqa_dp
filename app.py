@@ -178,22 +178,18 @@ def _ds_picker() -> None:
 
 
 # ══ 상단 바 ════════════════════════════════════════════
-# 왼쪽: 브랜드 / 오른쪽: 탭 + 계정 + 로그아웃 (한 줄, 오른쪽 정렬)
-top = st.columns([0.42, 0.58], vertical_alignment="center")
+# 왼쪽: 브랜드 + 탭 / 오른쪽: 데이터셋 선택 + 계정 + 로그아웃
+top = st.columns([0.55, 0.45], vertical_alignment="center")
 with top[0]:
-    with st.container(horizontal=True, vertical_alignment="center", gap="medium"):
+    with st.container(horizontal=True, vertical_alignment="center",
+                      gap="small", key="navleft"):
         st.html(
             '<div class="navbrand"><div class="mark">D</div>'
             '<div class="who"><b>DPilot</b><span>PRIVACY WORKSPACE</span></div></div>',
             width="content",
         )
-        _ds_picker()
-
-with top[1]:
-    bar = st.container(horizontal=True, horizontal_alignment="right",
-                       vertical_alignment="center", gap="small", key="navbar")
-    with bar:
-        # 현재 페이지는 st.navigation 이 돌려준 pg 기준 — 다른 화면에서 switch_page 해도 정확하다
+        st.html('<div class="navsep"></div>', width="content")
+        # 현재 페이지는 st.navigation 이 돌려준 pg 기준
         cur_title = getattr(pg, "title", st.session_state.nav_active)
         for i, pg_item in enumerate(FLAT):
             t = getattr(pg_item, "title", "")
@@ -202,6 +198,11 @@ with top[1]:
                 st.session_state.nav_active = t
                 st.switch_page(pg_item)
 
+with top[1]:
+    bar = st.container(horizontal=True, horizontal_alignment="right",
+                       vertical_alignment="center", gap="small", key="navbar")
+    with bar:
+        _ds_picker()                                   # 프라이버시 분석에서는 자리를 비운다
         st.html('<div class="navsep"></div>', width="content")
         st.html(
             '<div class="navuser"><div class="av">'

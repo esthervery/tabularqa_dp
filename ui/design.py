@@ -80,7 +80,7 @@ code{font-family:var(--mono) !important;font-size:.88em;background:var(--wash);
   display:none !important;
 }
 [data-testid="stMainBlockContainer"],.block-container{
-  padding:1.2rem 2.4rem 3rem !important; max-width:1440px !important;
+  padding:.55rem 2.4rem 1rem !important; max-width:1440px !important;
 }
 
 /* ══ 타이포 ═════════════════════════════════════════════ */
@@ -537,6 +537,54 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .stApp .hcell.ans{ font-family:"IBM Plex Mono",monospace; font-size:12.5px; }
 /* '자세히 보기' 버튼은 오른쪽 끝 정렬 */
 .stApp div[class*="st-key-det_"]{ display:flex; justify-content:flex-end; }
+
+/* ══ 콘솔 공간 확보 ═══════════════════════════════════ */
+/* 상단 바 — 브랜드·선택칸을 탭과 같은 36px 기준으로 */
+.stApp div.navbrand{ min-height:36px !important; }
+.stApp .st-key-navleft div[data-baseweb="select"]>div{
+  min-height:36px !important; font-size:13.5px !important;
+}
+/* 상단 바 ↔ 구분선 ↔ 본문 사이: Streamlit 기본 gap(1rem)을 일부 상쇄 */
+.stApp div.navrule{ margin:-6px 0 -8px !important; }
+
+/* 필드 힌트 밴드 — 전체적으로 압축 */
+.stApp .band{ padding:10px 14px 4px !important; margin:0 0 4px !important; }
+.stApp .bandhead{ margin-bottom:8px !important; }
+.stApp .blab .t{ font-size:14px !important; }
+.stApp .strip{ gap:8px !important; padding-bottom:6px !important; }
+.stApp .fcard{ flex:0 0 190px !important; width:190px !important; height:94px !important;
+  padding:8px 11px !important; }
+.stApp .fcard .fct{ padding-bottom:6px !important; }
+.stApp .fcard .fcl{ font-size:12.5px !important; }
+.stApp .fcard .fcv{ margin-top:6px !important; gap:4px !important; }
+.stApp .vchip{ padding:2px 7px !important; font-size:10.5px !important; }
+.stApp .faxis{ margin-top:8px !important; gap:7px !important; }
+
+/* 도넛 위 '통계 대상' 라벨 — 도넛·버튼과 같은 폭, 왼쪽 정렬 */
+.stApp .mtarget{ width:100%; box-sizing:border-box; padding:0 2px; margin:0 0 -4px;
+  font-size:12px; color:var(--mid); }
+.stApp .mtarget b{ margin-left:4px; font-size:13px; font-weight:700; color:var(--ink); }
+
+/* ── 상단 바 왼쪽(브랜드 | 탭) 구분자 ── */
+.stApp div.st-key-navleft div.navsep{ height:18px; margin:0 6px !important; align-self:center; }
+
+/* ── 콘솔: 구분선↔필드 힌트(②) 좁게 / 필드 힌트↔대화(③) 넓게 ── */
+.stApp .st-key-cband{ margin:-10px 0 14px !important; }
+.stApp .st-key-cband .band{ margin:0 !important; }
+
+/* ── 하단 고정 질의창(④): 배경·윗선·그림자로 '고정된 바' 느낌, 아래 여백 축소 ── */
+.stApp [data-testid="stBottom"]{
+  border-top:1px solid var(--bd);
+  box-shadow:0 -8px 18px -14px rgba(15,23,42,.25);
+}
+.stApp [data-testid="stBottom"] > div,
+.stApp [data-testid="stBottomBlockContainer"]{
+  background:var(--wash) !important;
+}
+.stApp [data-testid="stBottomBlockContainer"]{
+  padding:12px 2.4rem 14px !important;
+  max-width:1440px !important;
+}
 
 /* ── 상세 대화상자: 코드가 길면 가로 스크롤 대신 줄바꿈 ─────── */
 div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-all; }
