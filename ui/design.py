@@ -501,6 +501,46 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 .hcard .ha{font-size:13px;color:var(--mid);margin-top:6px;line-height:1.6}
 .hcard .anscode{margin-top:10px}
 
+/* ── 채팅 히스토리 표 ───────────────────────────── */
+/* 표 전체: 테두리 + 둥근 모서리, 행 사이 기본 gap 제거 */
+.stApp .st-key-htable{
+  gap:0 !important;
+  border:1px solid var(--bd) !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+  background:#fff !important;
+}
+/* 헤더 줄: 옅은 회색 배경 + 아래 진한 선 */
+.stApp .st-key-hhead{
+  background:#f8fafc !important;
+  border-bottom:1px solid var(--bd) !important;
+  padding:10px 16px !important;
+}
+.stApp .st-key-hhead .hcol{
+  font-size:12px !important; font-weight:700 !important;
+  color:var(--ink2) !important; letter-spacing:.02em;
+}
+.stApp .st-key-hhead .hcol.r{ text-align:right; }
+/* 데이터 행: 얇은 구분선 + hover 강조 */
+.stApp div[class*="st-key-hrow_"]{
+  padding:6px 16px !important;
+  border-bottom:1px solid #eef0f4 !important;
+  transition:background .12s;
+}
+.stApp div[class*="st-key-hrow_"]:last-child{ border-bottom:none !important; }
+.stApp div[class*="st-key-hrow_"]:hover{ background:#fafbff !important; }
+/* 셀 텍스트 */
+.stApp .hcell{ font-size:13px; color:var(--ink2); }
+.stApp .hcell.tm{ font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; }
+.stApp .hcell.q{ font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stApp .hcell.mono{ font-family:"IBM Plex Mono",monospace; font-size:12px; }
+.stApp .hcell.ans{ font-family:"IBM Plex Mono",monospace; font-size:12.5px; }
+/* '자세히 보기' 버튼은 오른쪽 끝 정렬 */
+.stApp div[class*="st-key-det_"]{ display:flex; justify-content:flex-end; }
+
+/* ── 상세 대화상자: 코드가 길면 가로 스크롤 대신 줄바꿈 ─────── */
+div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-all; }
+
 /* ══ 결재 항목 ══════════════════════════════════════════ */
 .decide{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
   padding-top:4px}

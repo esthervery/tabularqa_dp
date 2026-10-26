@@ -28,7 +28,7 @@ def render() -> None:
     if cur not in ORD:
         cur = ORD[0]
 
-    pick = st.session_state.get("hist_ds") or ALL_DS     # 표시용 ('전체' 또는 데이터셋 키)
+    pick = st.session_state.get("hist_ds") or ALL        # 표시용 ('전체' 또는 데이터셋 키)
     scope = None if pick == ALL else pick                # 조회용 (None = 전체)
 
 
@@ -59,26 +59,27 @@ def render() -> None:
 
 # ── 표 ────────────────────────────────────────────────
 def _table(rows: list[dict]) -> None:
-    with st.container(key="hhead"):
-        h = st.columns(COLS, vertical_alignment="center")
-        for i, t in enumerate(HEAD):
-            h[i].html(f'<div class="hcol{" r" if i == len(HEAD) - 1 else ""}">{t}</div>')
+    # htable 로 한 번 감싸야 행 사이 gap 을 0 으로 만들고 테두리를 둘 수 있다
+    with st.container(key="htable"):
+        with st.container(key="hhead"):
+            h = st.columns(COLS, vertical_alignment="center")
+            for i, t in enumerate(HEAD):
+                h[i].html(f'<div class="hcol{" r" if i == len(HEAD) - 1 else ""}">{t}</div>')
 
-    for r in rows:
-        ok = bool(r.get("ok"))
-        eps = float(r.get("eps_spent") or 0.0)
-        ans = (r.get("answer") or "").strip()
-        with st.container(key=f"hrow_{r['id']}"):
-            c = st.columns(COLS, vertical_alignment="center")
-            c[0].html(f'<div class="hcell tm">{_t(r.get("asked_at"))}</div>')
-            c[1].html(f'<div class="hcell q">{_esc(r.get("question") or "")}</div>')
-            c[2].html(f'<div class="hcell mono">{eps:.2f}</div>')
-            c[3].html(design.pill("허용", "success") if ok else design.pill("차단", "danger"))
-            # 응답: 받아온 값. 거절/실패 건은 '-' (값이 없으므로 비워 둔다)
-            c[4].html(f'<div class="hcell ans">{_esc(_short(ans)) if ok and ans else "&ndash;"}</div>')
-            if c[5].button("자세히 보기", key=f"det_{r['id']}", type="tertiary"):
-                st.session_state["hist_sel"] = int(r["id"])
-                st.rerun()
+        for r in rows:
+            ok = bool(r.get("ok"))
+            eps = float(r.get("eps_spent") or 0.0)
+            ans = (r.get("answer") or "").strip()
+            with st.container(key=f"hrow_{r['id']}"):
+                c = st.columns(COLS, vertical_alignment="center")
+                c[0].html(f'<div class="hcell tm">{_t(r.get("asked_at"))}</div>')
+                c[1].html(f'<div class="hcell q">{_esc(r.get("question") or "")}</div>')
+                c[2].html(f'<div class="hcell mono">{eps:.2f}</div>')
+                c[3].html(design.pill("허용", "success") if ok else design.pill("차단", "danger"))
+                c[4].html(f'<div class="hcell ans">{_esc(_short(ans)) if ok and ans else "&ndash;"}</div>')
+                if c[5].button("자세히 보기", key=f"det_{r['id']}", type="tertiary"):
+                    st.session_state["hist_sel"] = int(r["id"])
+                    st.rerun()
 
 
 # ── 대화상자 ──────────────────────────────────────────
@@ -92,8 +93,12 @@ def _dialog(rows: list[dict]) -> None:
         return
     _detail(row)
 
+def _close() -> None:
+    """X / ESC / 바깥 클릭으로 닫아도 선택 상태를 지운다 (안 지우면 다음 rerun 에 다시 뜸)."""
+    st.session_state["hist_sel"] = None
 
-@st.dialog("질의 상세")
+
+@st.dialog("질의 상세", width="medium", on_dismiss=_close)
 def _detail(r: dict) -> None:
     label = fields.SPECS.get(r.get("db_name"), {}).get("measure", {}).get("label", "결과")
     st.html(design.history_card(
