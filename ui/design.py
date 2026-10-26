@@ -576,9 +576,7 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 /* 두 컬럼 높이를 같게 — 오른쪽 카드가 왼쪽 카드 높이만큼 늘어난다 */
 .stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
 
-/* '0.00 / 2.00 ε' 가 줄바꿈되지 않게 */
-.stApp .st-key-cband .bring{ margin:0 !important; }
-.stApp .st-key-cband .bring *{ white-space:nowrap; }
+
 
 /* ── 오른쪽 영역: 왼쪽 필드 힌트 카드와 같은 높이 · 틀은 완전히 없음 ── */
 .stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
@@ -619,41 +617,44 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
   flex:1 1 auto !important;
   display:flex !important; flex-direction:column !important;
   justify-content:center !important;
+  padding-top:24px !important;   /* ← 추가: 숫자·도넛을 아래로 */
 }
 .stApp .st-key-cbring .bring{ margin:0 !important; padding:0 !important; }
 
-/* 제목 줄: 두 요소 모두 20px 한 줄 상자로 통일 → 같은 높이에 놓인다 */
-.stApp .st-key-cbhead{ min-height:20px !important; align-items:center !important; gap:8px !important; }
-.stApp .st-key-cbhead > div{ margin:0 !important; }
-.stApp .st-key-cbhead .mtarget{
-  margin:0 !important; line-height:20px !important;
-  font-size:12px; color:var(--dim); white-space:nowrap;
-}
-.stApp .st-key-cbhead .mtarget b{ font-size:13px; color:var(--ink); margin-left:4px; }
+/* ── 콘솔 ε 예산 미터: 수치는 도넛 바로 왼쪽, 아랫선 기준 ── */
+.bmeter{display:flex;align-items:flex-end;justify-content:flex-end;gap:12px;width:100%}
+.bm-txt{display:flex;flex-direction:column;align-items:flex-end;text-align:right;padding-bottom:4px}
+.bm-val{font-size:18px;font-weight:700;color:var(--ink);line-height:1.2;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+.bm-eps{font-weight:600;color:var(--mid);margin-left:4px}
+.bm-sub{font-size:12px;color:var(--dim);line-height:1.4;margin-top:2px;white-space:nowrap}
+.bm-ring{display:grid;place-items:center;flex:0 0 auto}
+.bm-ring > *{grid-area:1 / 1}
+.bm-pct{font-size:12px;font-weight:700;color:var(--ink2)}
 
-/* 예산 링크: 버튼 기본 높이·여백 제거, 텍스트와 같은 20px 줄 */
+/* 제목 줄: 두 요소 모두 22px 한 줄 상자로 통일 → 같은 높이에 놓인다 */
+.stApp .st-key-cbhead{ min-height:24px !important; align-items:center !important; gap:8px !important; }
+.stApp .st-key-cbhead .mtarget{
+  margin:0 !important; line-height:24px !important;
+  font-size:14px; color:var(--dim); white-space:nowrap;
+}
+.stApp .st-key-cbhead .mtarget b{ font-size:16px; font-weight:700; color:var(--ink); margin-left:5px; }
+
+/* 예산 링크: 버튼 기본 높이·여백 제거, 텍스트와 같은 22px 줄 */
 .stApp .st-key-to_budget,
 .stApp .st-key-to_budget .stButton{ margin:0 !important; display:flex; align-items:center; }
 .stApp .st-key-to_budget button{
-  height:20px !important; min-height:20px !important; padding:0 !important;
-  line-height:20px !important; display:flex !important; align-items:center !important;
+  height:22px !important; min-height:22px !important; padding:0 !important;
+  line-height:22px !important; display:flex !important; align-items:center !important;
   border:none !important; background:transparent !important; box-shadow:none !important;
 }
 .stApp .st-key-to_budget button p{
-  margin:0 !important; line-height:20px !important;
-  font-size:12px !important; font-weight:600 !important; color:var(--pri) !important;
+  margin:0 !important; line-height:22px !important;
+  font-size:13px !important; font-weight:600 !important; color:var(--pri) !important;
   white-space:nowrap;
 }
 .stApp .st-key-to_budget button:hover p{ color:var(--pri2) !important; text-decoration:underline; }
 .stApp .st-key-to_budget button:disabled p{ color:var(--dim) !important; text-decoration:none; }
-
-/* 예산 수치 폰트: 고정폭 → Pretendard (숫자 폭은 고정) */
-.stApp .st-key-cband .bring,
-.stApp .st-key-cband .bring *{
-  font-family:'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-  font-variant-numeric:tabular-nums;
-  letter-spacing:-.01em;
-}
 
 /* ── 상세 대화상자: 코드가 길면 가로 스크롤 대신 줄바꿈 ─────── */
 div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-all; }
@@ -685,6 +686,54 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
   padding:12px 2.4rem 14px !important;
   max-width:1440px !important;
 }
+
+/* ── 오른쪽 ε 카드: 흰 배경 + 테두리, 밑선은 필드 힌트 카드와 일치 ── */
+
+/* (1) 두 컬럼 높이를 같게 */
+.stApp .st-key-cband [data-testid="stHorizontalBlock"]{
+    align-items:stretch !important;
+}
+.stApp .st-key-cband .band{
+    margin-bottom:0 !important;          /* 필드 힌트 카드 밑선 = 왼쪽 컬럼 바닥 */
+}
+
+/* (2) 오른쪽 컬럼 → cbright → cbring 까지 남은 높이를 끝까지 채움 */
+.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring){
+    display:flex !important;
+    flex-direction:column !important;
+}
+.stApp .st-key-cband [data-testid="stColumn"]:has(.st-key-cbring) div:has(.st-key-cbring){
+    display:flex !important;
+    flex-direction:column !important;
+    flex:1 1 auto !important;
+}
+.stApp .st-key-cbright{
+    gap:8px !important;                  /* 제목 줄 ↔ 카드 간격 */
+}
+
+/* (3) 카드 본체 */
+.stApp .st-key-cbring{
+    flex:1 1 auto !important;
+    justify-content:center !important;   /* 카드 안에서 세로 가운데 */
+    background:#fff !important;
+    border:1px solid var(--bd) !important;
+    border-radius:12px !important;
+    box-shadow:none !important;
+    padding:12px 16px !important;
+}
+
+/* (4) 카드 안 배치 */
+.stApp .st-key-cbring .bmeter{
+    justify-content:center !important;   /* 카드 안에서 가로 가운데 */
+    gap:18px !important;                 /* 수치 ↔ 도넛 간격 */
+    padding-right:0 !important;
+}
+.stApp .st-key-cbring .bmeter > :first-child{
+    padding-bottom:4px !important;       /* 수치를 도넛 아래쪽 높이에 맞춤 */
+    margin-right:0 !important;
+}
+.stApp .st-key-cbring .bmeter .bm-val{ font-size:16px !important; }
+.stApp .st-key-cbring .bmeter > :first-child > :last-child{ font-size:11px !important; }
 
 /* 이전 버전 호환용 (본문 topbar 는 더 이상 그리지 않음) */
 .topbar{display:none}
@@ -1081,4 +1130,29 @@ def budget_ring(spent: float, total: float, remain: int, *, size: int = 72) -> s
         f'transform="rotate(-90 {c} {c})"/>'
         f'<text x="{c}" y="{c + 4.5}" text-anchor="middle">{ratio * 100:.0f}%</text>'
         f'</svg></div>'
+    )
+
+
+def budget_meter(spent: float, total: float, remain: int, *, size: int = 64) -> str:
+    """콘솔 오른쪽 ε 예산 — [수치 · 잔여(오른쪽 정렬, 도넛 아랫선 기준)] [도넛]."""
+    total = max(float(total), 1e-9)
+    ratio = max(0.0, min(1.0, float(spent) / total))
+    color = "#f43f5e" if ratio >= 0.8 else "#6366f1"
+    sw = 7
+    h = size / 2
+    r = (size - sw) / 2
+    c = 2 * math.pi * r
+    arc = (f'<circle cx="{h}" cy="{h}" r="{r}" fill="none" stroke="{color}" stroke-width="{sw}" '
+           f'stroke-linecap="round" stroke-dasharray="{c * ratio:.2f} {c:.2f}" '
+           f'transform="rotate(-90 {h} {h})"/>') if ratio > 0 else ""
+    return (
+        '<div class="bmeter">'
+        '<div class="bm-txt">'
+        f'<div class="bm-val">{float(spent):.2f} / {total:.2f}<span class="bm-eps">ε</span></div>'
+        f'<div class="bm-sub">잔여 {int(remain)}회</div>'
+        '</div>'
+        f'<div class="bm-ring"><svg width="{size}" height="{size}" viewBox="0 0 {size} {size}">'
+        f'<circle cx="{h}" cy="{h}" r="{r}" fill="none" stroke="#e2e8f0" stroke-width="{sw}"/>'
+        f'{arc}</svg><span class="bm-pct">{ratio * 100:.0f}%</span></div>'
+        '</div>'
     )

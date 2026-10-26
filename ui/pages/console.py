@@ -171,7 +171,7 @@ def _band(cur: str) -> None:
 
     with st.container(key="cband"):
         # top 정렬 — 두 영역의 첫 줄(필드 힌트 / 통계 대상)이 같은 윗선에서 시작한다
-        left, right = st.columns([4.2, 1], gap="small", vertical_alignment="top")
+        left, right = st.columns([4.4, 1], gap="small", vertical_alignment="top")
         with left:
             _band_body(cur)
         with right:
@@ -188,7 +188,7 @@ def _band(cur: str) -> None:
                 # 수치 + 도넛 — 남은 높이의 세로 가운데
                 with st.container(key="cbring"):
                     # SVG 는 st.html(DOMPurify)에서 제거되므로 st.markdown 으로 렌더링한다
-                    st.markdown(design.budget_ring(spent, total, remain),
+                    st.markdown(design.budget_meter(spent, total, remain, size=84),
                                 unsafe_allow_html=True, width="stretch")
 
 
