@@ -501,29 +501,30 @@ def log_query(username: str, db_name: str,
         return int(cur.lastrowid)
 
 
-def list_queries(username: str, db_name: str, limit: int = 100) -> list[dict]:
-    """해당 (계정 × 데이터셋) 의 질의 기록 (최신순)."""
+def list_queries(username: str, db_name: str | None = None, limit: int = 100) -> list[dict]:
+    """질의 기록 (시각 최신순). db_name=None 이면 전체 데이터셋."""
+    sql = "SELECT * FROM query_log WHERE username = ?"
+    args: list = [username]
+    if db_name:                       # None/'전체' → 조건 없이 전체
+        sql += " AND db_name = ?"
+        args.append(db_name)
+    sql += " ORDER BY asked_at DESC, id DESC LIMIT ?"
+    args.append(int(limit))
     with connect() as con:
-        rows = con.execute(
-            "SELECT * FROM query_log WHERE username = ? AND db_name = ? "
-            "ORDER BY id DESC LIMIT ?",
-            (username, db_name, int(limit)),
-        ).fetchall()
+        rows = con.execute(sql, args).fetchall()
     return [dict(r) for r in rows]
 
 
-def count_queries(username: str, db_name: str, only_ok: bool = True) -> int:
-    """해당 (계정 × 데이터셋) 의 질의 횟수.
-
-    only_ok=True  → 응답을 받은 질의만 (기본값)
-    only_ok=False → 실행 실패·예산 초과 차단까지 포함한 시도 횟수
-    """
-    q = ("SELECT COUNT(*) AS c FROM query_log "
-         "WHERE username = ? AND db_name = ?")
+def count_queries(username: str, db_name: str | None = None, only_ok: bool = True) -> int:
+    q = "SELECT COUNT(*) AS c FROM query_log WHERE username = ?"
+    args: list = [username]
+    if db_name:
+        q += " AND db_name = ?"
+        args.append(db_name)
     if only_ok:
         q += " AND ok = 1"
     with connect() as con:
-        return int(con.execute(q, (username, db_name)).fetchone()["c"])
+        return int(con.execute(q, args).fetchone()["c"])
 
 
 def spent_epsilon(username: str, db_name: str) -> float:

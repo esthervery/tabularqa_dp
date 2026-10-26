@@ -124,11 +124,15 @@ design.inject()
 
 
 # ── 상단 데이터셋 선택 ─────────────────────────────────
-# 공용 값은 db_name(항상 실제 데이터셋). 예산 관리의 '전체' 필터는 adm_ds 에 따로 둔다.
+# 공용 값은 db_name(항상 실제 데이터셋). '전체' 필터는 화면별 전용 키에 따로 둔다.
+#   예산 관리     → adm_ds   (기본: 전체)
+#   채팅 히스토리 → hist_ds  (기본: 전체)
+# 예산 관리의 '전체' 필터는 adm_ds 에 따로 둔다.
 # key 를 쓰지 않고 index 로만 현재 값을 표현한다 (v17 버그 회피 — console.py 주석 참고).
 ALL_DS = "전체"
 CUR_TITLE = getattr(pg, "title", st.session_state.nav_active)
-DS_MODE = {"예산 관리": "admin", "프라이버시 분석": "none"}.get(CUR_TITLE, "ds")
+DS_MODE = {"예산 관리": "admin", "프라이버시 분석": "none",
+           "채팅 히스토리": "hist"}.get(CUR_TITLE, "ds")
 
 
 def _ds_label(k: str) -> str:
@@ -136,28 +140,41 @@ def _ds_label(k: str) -> str:
 
 
 def _ds_picker() -> None:
-    if DS_MODE == "admin":
+    """데이터셋 선택기 — mode="none"(프라이버시 분석)일 때만 자리를 비운다."""
+    if DS_MODE == "none":
+        return
+
+    if DS_MODE in ("admin", "hist"):        # '전체' 허용 (기본값 = 전체)
         opts = [ALL_DS] + ENABLED
-        now = st.session_state.setdefault("adm_ds", ALL_DS)
-        if now not in opts:
+        skey = "adm_ds" if DS_MODE == "admin" else "hist_ds"
+        now = st.session_state.setdefault(skey, ALL_DS)
+        if now not in opts:                 # 정렬·구성 변화 방어
             now = ALL_DS
-        pick = st.selectbox("데이터셋", opts, index=opts.index(now), format_func=_ds_label,
-                            label_visibility="collapsed", width=340)
-        if pick != now:
-            st.session_state.adm_ds = pick
-            # 특정 데이터셋을 고르면 공용 값도 맞춰 둔다 → 콘솔로 가도 같은 데이터셋
-            if pick != ALL_DS and pick != st.session_state.db_name:
-                st.session_state.db_name = pick
-                state.reset_console()
-            st.rerun()
-    elif DS_MODE == "ds":
+            st.session_state[skey] = now
+    else:                                    # "ds" — 질의 콘솔 (전체 없음)
+        opts, skey = ENABLED, None
         now = st.session_state.db_name
-        pick = st.selectbox("데이터셋", ENABLED, index=ENABLED.index(now), format_func=_ds_label,
-                            label_visibility="collapsed", width=340)
-        if pick != now:
-            st.session_state.db_name = pick
+
+    pick = st.selectbox(
+        f"dataset_{DS_MODE}",                # 라벨을 모드별로 달리해 위젯 상태를 분리
+        opts, index=opts.index(now), format_func=_ds_label,
+        label_visibility="collapsed", width=340,
+    )
+    if pick == now:
+        return
+
+    if skey is None:                         # 질의 콘솔 — 공용 값(db_name)을 바꾼다
+        st.session_state.db_name = pick
+        state.reset_console()
+    else:
+        st.session_state[skey] = pick
+        if DS_MODE == "admin" and pick != ALL_DS and pick != st.session_state.db_name:
+            st.session_state.db_name = pick   # 예산 관리에서 특정 셋을 고르면 공용 값도 동기화
             state.reset_console()
-            st.rerun()   # 맨 위 state.apply_effective_policy() 가 새 데이터셋 기준으로 다시 돈다
+        if DS_MODE == "hist":
+            st.session_state["hist_sel"] = None   # 데이터셋을 바꾸면 열린 상세는 닫는다
+    st.rerun()
+
 
 
 # ══ 상단 바 ════════════════════════════════════════════

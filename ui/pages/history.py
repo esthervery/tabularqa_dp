@@ -1,7 +1,7 @@
 """채팅 히스토리 — (계정 × 데이터셋) 질의·응답 기록.
 
-단일 출처는 SQLite 의 query_log 다. 세션 상태(messages)는 '지금 화면의 대화'일 뿐이고,
-데이터셋을 바꾸거나 로그아웃해도 남는 기록은 여기서 본다.
+기본은 표(한 눈에 훑기)이고, 코드·응답 전문은 [자세히 보기] 대화상자에서 본다.
+단일 출처는 SQLite 의 query_log 다.
 """
 from __future__ import annotations
 
@@ -12,64 +12,115 @@ from ui import db, design, fields
 ORD = [k for k, v in fields.SPECS.items() if v.get("enabled")]
 TL = {k: fields.SPECS[k]["title"] for k in ORD}
 EPS = 0.1
+ALL = "전체"
+
+COLS = (1.15, 4.6, 0.7, 0.85, 2.6, 1.05)        # 시각·질의·ε·상태·응답·상세
+HEAD = ("시각", "질의", "ε", "상태", "응답", "상세")
 
 
 def render() -> None:
     design.inject()
-    is_admin = bool(st.session_state.get("is_admin"))
-    st.markdown(design.page_head("채팅 히스토리",
-                                 "데이터셋별 질의·응답 기록 — 감사 추적용으로 삭제되지 않습니다"),
-                unsafe_allow_html=True)
+    # st.markdown(design.page_head("채팅 히스토리",
+    #                              "데이터셋별 질의·응답 기록 — 감사 추적용으로 삭제되지 않습니다"),
+    #             unsafe_allow_html=True)
 
     cur = st.session_state.get("db_name")
     if cur not in ORD:
         cur = ORD[0]
 
-    pick = cur   # 데이터셋은 상단 바에서 고른다
+    pick = st.session_state.get("hist_ds") or ALL_DS     # 표시용 ('전체' 또는 데이터셋 키)
+    scope = None if pick == ALL else pick                # 조회용 (None = 전체)
+
+
     limit = st.selectbox("표시 개수", [20, 50, 100, 200], index=1, key="hist_limit", width=160)
 
-
     user = st.session_state.get("username") or "analyst"
-    rows = db.list_queries(user, pick, limit=int(limit))
-    spent = db.spent_epsilon(user, pick)
-    ok_n = db.count_queries(user, pick, only_ok=True)
-    fail_n = db.count_queries(user, pick, only_ok=False) - ok_n
+    rows  = db.list_queries(user, scope, limit=int(limit))
+    spent = db.spent_epsilon(user, scope)
+    ok_n   = db.count_queries(user, scope, only_ok=True)
+    fail_n = db.count_queries(user, scope, only_ok=False) - ok_n
+
 
     st.markdown(design.line([
         ("질의", f"{ok_n}건"),
         ("차단·실패", f"{fail_n}건"),
         ("누적 ε", f"{spent:.2f}"),
-        ("데이터셋", pick),
+        ("데이터셋", ALL if scope is None else pick),
     ]), unsafe_allow_html=True)
     st.write("")
 
     if not rows:
-        st.markdown(design.empty("이 데이터셋에 대한 기록이 없습니다"), unsafe_allow_html=True)
+        st.markdown(design.empty("해당 범위에 기록이 없습니다"), unsafe_allow_html=True)
         return
 
-    # 기록마다 st.html 로 따로 그린다 (st.markdown + 빈 줄 → 태그 노출 버그 방지)
-    label = fields.SPECS.get(pick, {}).get("measure", {}).get("label", "결과")
+    _table(rows)
+    _dialog(rows)
+
+
+# ── 표 ────────────────────────────────────────────────
+def _table(rows: list[dict]) -> None:
+    with st.container(key="hhead"):
+        h = st.columns(COLS, vertical_alignment="center")
+        for i, t in enumerate(HEAD):
+            h[i].html(f'<div class="hcol{" r" if i == len(HEAD) - 1 else ""}">{t}</div>')
+
     for r in rows:
-        st.html(design.history_card(
-            _t(r.get("asked_at")),
-            r.get("question") or "",
-            r.get("code") or "",
-            (r.get("answer") or "").strip(),
-            ok=bool(r.get("ok")),
-            eps=float(r.get("eps_spent") or 0.0),
-            label=label,
-        ))
+        ok = bool(r.get("ok"))
+        eps = float(r.get("eps_spent") or 0.0)
+        ans = (r.get("answer") or "").strip()
+        with st.container(key=f"hrow_{r['id']}"):
+            c = st.columns(COLS, vertical_alignment="center")
+            c[0].html(f'<div class="hcell tm">{_t(r.get("asked_at"))}</div>')
+            c[1].html(f'<div class="hcell q">{_esc(r.get("question") or "")}</div>')
+            c[2].html(f'<div class="hcell mono">{eps:.2f}</div>')
+            c[3].html(design.pill("허용", "success") if ok else design.pill("차단", "danger"))
+            # 응답: 받아온 값. 거절/실패 건은 '-' (값이 없으므로 비워 둔다)
+            c[4].html(f'<div class="hcell ans">{_esc(_short(ans)) if ok and ans else "&ndash;"}</div>')
+            if c[5].button("자세히 보기", key=f"det_{r['id']}", type="tertiary"):
+                st.session_state["hist_sel"] = int(r["id"])
+                st.rerun()
 
 
+# ── 대화상자 ──────────────────────────────────────────
+def _dialog(rows: list[dict]) -> None:
+    sel = st.session_state.get("hist_sel")
+    if sel is None:
+        return
+    row = next((x for x in rows if int(x["id"]) == int(sel)), None)
+    if row is None:                      # 표시 개수/범위가 바뀌어 사라진 경우
+        st.session_state["hist_sel"] = None
+        return
+    _detail(row)
+
+
+@st.dialog("질의 상세")
+def _detail(r: dict) -> None:
+    label = fields.SPECS.get(r.get("db_name"), {}).get("measure", {}).get("label", "결과")
+    st.html(design.history_card(
+        _t(r.get("asked_at")),
+        r.get("question") or "",
+        r.get("code") or "",
+        (r.get("answer") or "").strip(),
+        ok=bool(r.get("ok")),
+        eps=float(r.get("eps_spent") or 0.0),
+        label=label,
+    ))
+    if st.button("닫기", key="hist_close"):
+        st.session_state["hist_sel"] = None
+        st.rerun()
+
+
+# ── 헬퍼 ──────────────────────────────────────────────
 def _t(v: str | None) -> str:
     if not v:
         return "-"
-    return str(v).replace("T", " ")[5:16]
+    return str(v).replace("T", " ")[5:19]      # '10-25 23:25:41' — 초까지
 
+def _short(s, n: int = 44) -> str:
+    v = " ".join(design.fmt_answer(s).split())  # 숫자 포맷 재사용 + 줄바꿈 정리
+    return v if len(v) <= n else v[: n - 1] + "…"
 
 def _esc(s) -> str:
-    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-
-# Streamlit 은 페이지 파일을 '스크립트'로 실행한다 — render() 를 직접 호출해야 한다.
 render()

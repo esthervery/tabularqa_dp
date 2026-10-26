@@ -34,10 +34,10 @@ RISK_EPS = db.RISK_TO_EPSILON
 
 def render() -> None:
     design.inject()
-    st.markdown(design.page_hero(
-        "예산 신청",
-        "더 정밀한 결과가 필요하면 관리자에게 리스크 레벨 상향을 요청합니다."),
-        unsafe_allow_html=True)
+    # st.markdown(design.page_hero(
+    #     "예산 신청",
+    #     "더 정밀한 결과가 필요하면 관리자에게 리스크 레벨 상향을 요청합니다."),
+    #     unsafe_allow_html=True)
 
     user = st.session_state.get("username") or "analyst"
     cur = st.session_state.get("db_name")
