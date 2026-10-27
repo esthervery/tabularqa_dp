@@ -274,8 +274,9 @@ def create_user(username: str, password: str,
 
 def set_password(username: str, password: str) -> tuple[bool, str]:
     """기존 계정의 비밀번호를 바꾼다 (새 salt 로 다시 파생)."""
-    if len(password) < 8:
-        return False, "비밀번호는 8자 이상이어야 합니다."
+    ok, why = validate_password(password, username)
+    if not ok:
+        return False, why
     salt = secrets.token_hex(16)
     with connect() as con:
         cur = con.execute(
@@ -321,8 +322,9 @@ def change_password(username: str, current: str, new: str) -> tuple[bool, str]:
     """본인 비밀번호 변경. 현재 비밀번호가 맞아야 바꾼다."""
     if not current or not new:
         return False, "비밀번호를 모두 입력하세요."
-    if len(new) < 8:
-        return False, "새 비밀번호는 8자 이상이어야 합니다."
+    ok, why = validate_password(new, username)
+    if not ok:
+        return False, why
     if new == current:
         return False, "현재 비밀번호와 다른 비밀번호를 입력하세요."
 
