@@ -83,17 +83,6 @@ def _frame(tr, k_now: int, k_tot: int, ylim, ylabel: str) -> bytes:
     for s in ("left", "bottom"):
         ax.spines[s].set_color(GRID)
 
-    i = k_now - 1
-    m = tr.cum_means[i]
-    w = tr.ci_his[i] - tr.ci_los[i]
-    err = abs(m - tr.true_mean) / abs(tr.true_mean) * 100 if tr.true_mean else float("nan")
-    info = (f"k = {k_now} / {k_tot}\n"
-            f"추정된 평균값 = {dp_sim.fmt_sig(m, 5)}\n"
-            f"신뢰구간 폭 = {dp_sim.fmt_sig(w)}\n"
-            f"실제 평균값과의 오차 = {err:.2f}%")
-    ax.text(0.99, 0.96, info, transform=ax.transAxes, ha="right", va="top",
-            fontsize=8.5, color=INK, linespacing=1.5,
-            bbox=dict(boxstyle="round,pad=0.5", fc="white", ec=GRID))
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.24), ncol=4,
               frameon=False, fontsize=7.5, labelcolor=INK)
 
@@ -103,19 +92,43 @@ def _frame(tr, k_now: int, k_tot: int, ylim, ylabel: str) -> bytes:
     return buf.getvalue()
 
 
-def play(tr, level: int, ylabel: str, slot) -> None:
+def stats_html(tr, k_now: int, k_tot: int) -> str:
+    """그래프 오른쪽 수치 패널 — 그림 밖에 두어 그래프를 가리지 않는다."""
+    i = k_now - 1
+    m, lo, hi = tr.cum_means[i], tr.ci_los[i], tr.ci_his[i]
+    ok = np.isfinite(lo) and np.isfinite(hi)
+    f = dp_sim.fmt_sig
+    err = abs(m - tr.true_mean) / abs(tr.true_mean) * 100 if tr.true_mean else float("nan")
+    rows = [
+        ("질의 횟수", f"{k_now} / {k_tot}"),
+        ("추정된 평균값", f(m, 5)),
+        ("95% 신뢰구간", f"[{f(lo, 5)}, {f(hi, 5)}]" if ok else "—"),
+        ("신뢰구간 폭", f(hi - lo) if ok else "—"),
+        ("실제 평균값", f(tr.true_mean, 5)),
+        ("실제 평균값과의 오차", f"{err:.2f}%" if np.isfinite(err) else "—"),
+    ]
+    return ('<div class="dpstat">'
+            + "".join(f'<div class="r"><span class="k">{k}</span><b>{v}</b></div>' for k, v in rows)
+            + '</div>')
+
+
+def play(tr, level: int, ylabel: str, slot, info=None) -> None:
     """일정한 속도로 k=QUERIES_PER_FRAME … k_tot 까지 재생."""
     k_tot = tr.k_of(level)
     ylim = _ylim(tr)
     for k in range(QUERIES_PER_FRAME, k_tot + 1, QUERIES_PER_FRAME):
         t0 = time.perf_counter()
         slot.image(_frame(tr, k, k_tot, ylim, ylabel), width="stretch")
+        if info is not None:
+            info.html(stats_html(tr, k, k_tot))
         rest = FRAME_INTERVAL_S - (time.perf_counter() - t0)
         if rest > 0:
             time.sleep(rest)
 
 
-def still(tr, level: int, ylabel: str, slot) -> None:
+def still(tr, level: int, ylabel: str, slot, info=None) -> None:
     """마지막 장면 한 장 (재생 후 다른 조작으로 rerun 될 때)."""
     k_tot = tr.k_of(level)
     slot.image(_frame(tr, k_tot, k_tot, _ylim(tr), ylabel), width="stretch")
+    if info is not None:
+        info.html(stats_html(tr, k_tot, k_tot))

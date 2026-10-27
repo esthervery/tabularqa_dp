@@ -817,11 +817,11 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
 .pmode.m{ background:var(--prisoft); color:var(--pri2); border:1px solid var(--priline); }
 .pmode.a{ background:var(--bd2); color:var(--mid); border:1px solid var(--bd); }
 
+
 /* ════════════════════════════════════════════════════════════════
    12. 호환용 — 현재 화면에서 호출하지 않는 함수의 스타일
        (함수를 지울 때 함께 지워도 된다)
    ════════════════════════════════════════════════════════════════ */
-
 /* budget_ring() — 예전 콘솔 도넛 (지금은 budget_meter() 사용) */
 .stApp .bring{
   display:flex !important; align-items:center !important;
@@ -946,6 +946,7 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 /* 페이지 번호 줄 */
 .stApp .st-key-hist_page_wrap,.stApp .st-key-adm_page_wrap{margin-top:12px}
 
+
 /* ════════════════════════════════════════════════════════════════
    11-2. [budget_request.py] 예산 신청 — ε 도넛 카드 · Utility 레벨 카드 버튼
    ════════════════════════════════════════════════════════════════ */
@@ -1027,7 +1028,6 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 .stApp div[class*="st-key-lvl_off_"] button p{ color:var(--dim) !important; }
 
 
-
 /* ── 10-1. 예산 관리 · 상태 필터 탭 (segmented_control key="adm_tab") ── */
 .stApp .st-key-adm_tab{ margin:2px 0 12px; }                                     /* ① */
 .stApp .st-key-adm_tab button{
@@ -1046,6 +1046,35 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 .stApp .st-key-adm_tab button:nth-of-type(1)[data-testid$="Active"]{ --tone:var(--wrn2); --soft:var(--wrnsoft); }
 .stApp .st-key-adm_tab button:nth-of-type(2)[data-testid$="Active"]{ --tone:var(--suc2); --soft:var(--sucsoft); }
 .stApp .st-key-adm_tab button:nth-of-type(3)[data-testid$="Active"]{ --tone:var(--dan2); --soft:var(--dansoft); }
+
+
+/* ══ 11-x. 프라이버시 분석 — 1027 수정 ══ */
+/* Utility 1~5 → 텍스트 링크 (선택 열 = 진하게 + 밑줄) */
+.stApp div[class*="st-key-pa_ut"] .stButton>button{
+  border:none !important; background:transparent !important; box-shadow:none !important;
+  min-height:0 !important; height:auto !important; padding:4px 0 !important;
+  justify-content:flex-end !important;            /* 아래 값(오른쪽 정렬)과 맞춤 */
+}
+.stApp div[class*="st-key-pa_ut"] .stButton>button p{
+  font-size:13px !important; font-weight:600 !important; color:var(--pri) !important;
+  text-underline-offset:4px;
+}
+.stApp div[class*="st-key-pa_ut"] .stButton>button:hover p{ text-decoration:underline; }
+.stApp div[class*="st-key-pa_uton_"] .stButton>button p{
+  color:var(--pri2) !important; font-weight:800 !important;
+  text-decoration:underline; text-decoration-thickness:2px;
+}
+
+/* 막대 — 선택 여부와 관계없이 모두 진하게 */
+.stApp .pa-cell, .stApp .pa-cell .bar, .stApp .pa-cell .bar span{ opacity:1 !important; }
+.stApp .pa-cell .bar span{ background:var(--pri) !important; }
+
+/* 시뮬레이션 수치 패널 (dp_viz.stats_html) */
+.dpstat{ display:flex; flex-direction:column; gap:9px; padding:4px 0 4px 18px;
+  border-left:1px solid var(--bd); }
+.dpstat .r{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.dpstat .k{ font-size:12px; color:var(--mid); }
+.dpstat b{ font-size:13.5px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
 
 </style>
 """

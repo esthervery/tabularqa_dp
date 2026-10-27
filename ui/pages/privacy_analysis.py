@@ -140,7 +140,7 @@ def _cell(v: float, wmax: float, k: int, on: bool) -> str:
     return (f'<div class="pa-cell{" on" if on else ""}">'
             f'<span class="v">{dp_sim.fmt_sig(v)}</span>'
             f'<div class="bar"><span style="width:{pct:.0f}%"></span></div>'
-            f'<span class="k">질의 {k}회</span></div>')
+            '</div>')
 
 
 def _sim(spec: dict, tr, sel: int | None) -> None:
@@ -165,22 +165,14 @@ def _sim(spec: dict, tr, sel: int | None) -> None:
     if dp_viz.KO_FONT is None:
         st.caption("한글 글꼴을 찾지 못해 그래프 글자가 깨질 수 있습니다 (맑은 고딕 · 나눔고딕 설치 필요).")
 
-    slot = st.empty()
+    g_col, s_col = st.columns(dp_viz.SIM_COLS, gap="medium", vertical_alignment="center")
+    slot = g_col.empty()
+    info = s_col.empty()
     if st.session_state.get(PLAY):
         st.session_state[PLAY] = False            # 한 번만 재생 — 이후 rerun 은 마지막 장면
-        dp_viz.play(tr, sel, ylabel, slot)
+        dp_viz.play(tr, sel, ylabel, slot, info)
     else:
-        dp_viz.still(tr, sel, ylabel, slot)
-
-    mean, lo, hi, w = tr.final(sel)
-    f = dp_sim.fmt_sig
-    st.markdown(
-        '<div class="pa-res">'
-        f'<span>추정된 평균값<b>{f(mean, 5)}</b></span>'
-        f'<span>95% 신뢰구간<b>[{f(lo, 5)}, {f(hi, 5)}]</b></span>'
-        f'<span class="w">신뢰구간 폭<b>{f(w)}</b></span>'
-        f'<span>실제 평균값<b>{f(tr.true_mean, 5)}</b></span>'
-        '</div>', unsafe_allow_html=True)
+        dp_viz.still(tr, sel, ylabel, slot, info)
 
 
 # ── 2) 데이터셋 기본 정책 설정 ────────────────────────────
