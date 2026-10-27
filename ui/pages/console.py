@@ -22,7 +22,7 @@ import streamlit as st
 
 from ui import agent_bridge as ab
 
-from ui import db, design, fields, guardrail, hints, state, dp_noise
+from ui import db, design, fields, guardrail, hints, state, dp_noise, rate_limit
 from ui import answer_explain as ax
 
 
@@ -284,9 +284,6 @@ def _suggestions(cur: str) -> None:
 
 def _composer(cur: str) -> None:
     """입력줄 — st.bottom(공식 하단 고정 영역)에 폼을 둔다.
-
-    st.bottom 은 Streamlit 이 관리하는 영역이라 직접 만든 fixed 오버레이와 다르다.
-    단, 질의 처리(_answer)는 본문에서 호출해야 '작성 중' 카드가 대화 흐름 안에 뜬다.
     """
     spec = fields.SPECS.get(cur, {})
     pat = (spec.get("pat") or [{}])[0]
@@ -314,11 +311,17 @@ def _composer(cur: str) -> None:
 
 
 # ── 질의 처리 ────────────────────────────────────────────
-
 def _answer(cur: str, q: str) -> None:
+    
     user = st.session_state.get("username") or "analyst"
     eps = float(st.session_state.get("eps") or EPS)
     meas = fields.SPECS[cur]["measure"]
+
+    wait = rate_limit.try_acquire(_user())
+    if wait:
+        st.toast(f"질의는 6초에 한 번만 보낼 수 있어요 — {wait:.0f}초 후 다시 시도하세요",
+                 icon=":material/schedule:")
+        return
 
     # 1) 가드레일 — 허용 여부 + 질의코드 (fail-closed)
     #    질의코드가 없으면 노이즈 Δ 를 정할 수 없으므로, 가드레일을 끈 상태에서는 질의를 받지 않는다.

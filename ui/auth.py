@@ -44,7 +44,7 @@ def _render_login_form() -> None:
     """로그인 탭 폼. 성공 시 세션 채우고 rerun."""
     with st.form("login", clear_on_submit=False, border=False):
         u = st.text_input("아이디")
-        p = st.text_input("비밀번호", type="password", placeholder="영문 대문자·소문자·숫자·특수문자 중 3종류 이상 조합, 10자 이상")
+        p = st.text_input("비밀번호", type="password")
         submitted = st.form_submit_button(
             "로그인", type="primary", use_container_width=True,
         )
@@ -80,7 +80,7 @@ def _render_signup_form() -> None:
     """회원가입 탭 폼."""
     with st.form("signup", clear_on_submit=False, border=False):
         u  = st.text_input("아이디 ", placeholder="영문/숫자 조합")
-        p1 = st.text_input("비밀번호 ", type="password", help="8자 이상")
+        p1 = st.text_input("비밀번호 ", type="password", placeholder="대문자/소문자/특수문자를 섞어 10자 이상")
         p2 = st.text_input("비밀번호 확인", type="password")
 
         if not st.form_submit_button("가입", use_container_width=True):
