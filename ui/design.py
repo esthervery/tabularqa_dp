@@ -1080,6 +1080,15 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 .dpstat .k{ font-size:12px; color:var(--mid); }
 .dpstat b{ font-size:13.5px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
 
+/* LLM 해설 말풍선 (privacy_analysis._llm_html) */
+.pa-llm{ display:flex; gap:10px; align-items:flex-start; margin-top:14px; }
+.pa-llm .av{ flex:0 0 28px; height:28px; border-radius:50%; background:var(--pri); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; font-style:italic; }
+.pa-llm .tx{ flex:1; padding:10px 14px; border-radius:4px 14px 14px 14px;
+  background:var(--prisoft); border:1px solid var(--priline);
+  font-size:12.5px; line-height:1.65; color:var(--ink2); word-break:keep-all; }
+.pa-llm .ld{ color:var(--mid); }
+.pa-llm .er{ color:var(--dan2); }
 
 /* ══ 11-x. 데이터셋 별 정책 현황 — 얇은 행 ══ */
 .stApp .st-key-card_policies .trow{

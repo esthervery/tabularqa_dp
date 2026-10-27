@@ -24,6 +24,10 @@ try:
 except Exception as _e:   # scipy · matplotlib 미설치 등 — 화면은 뜨고 안내만 남긴다
     dp_sim = dp_viz = None
     _SIM_ERR = f"{type(_e).__name__}: {_e}"
+try:
+    from ui import sim_explain
+except Exception:           # 해설이 없어도 시뮬레이션은 동작
+    sim_explain = None
 
 RISKS = [1, 2, 3, 4, 5]
 COLS = [1.6, 1, 1, 1, 1, 1]               # 데이터셋 | U1..U5 — 머리줄·값줄 공통
@@ -143,6 +147,16 @@ def _cell(v: float, wmax: float, k: int, on: bool) -> str:
             '</div>')
 
 
+def _loading_html(msg: str = "결과를 해석하고 있습니다…") -> str:
+    """LLM 해설 대기 중 말풍선 — 도는 링 + 문구 (CSS 애니메이션이라 재생 중에도 돈다)"""
+    return (
+        '<div class="pa-load">'
+        '<span class="pa-spin"></span>'
+        f'<span class="pa-load-t">{msg}</span>'
+        '</div>'
+    )
+
+
 def _sim(spec: dict, tr, sel: int | None) -> None:
     if sel is None:
         st.markdown('<div class="pa-empty">유틸리티 버튼을 눌러 프라이버시 리스크를 시뮬레이션하세요</div>',
@@ -167,12 +181,42 @@ def _sim(spec: dict, tr, sel: int | None) -> None:
 
     g_col, s_col = st.columns(dp_viz.SIM_COLS, gap="medium", vertical_alignment="center")
     slot = g_col.empty()
-    info = s_col.empty()
+    with s_col:
+        info = st.empty()          # 수치 패널
+        note = st.empty()          # LLM 해설
+
+    # 해설: 캐시가 있으면 바로, 없으면 애니메이션과 동시에 생성 시작
+    fut = None
+    if sim_explain is not None:
+        payload = sim_explain.build_payload(spec, tr, sel)
+        text = sim_explain.cached(payload)
+        if text is None:
+            fut = sim_explain.submit(payload)
+            note.html(_llm_html(None))
+        else:
+            note.html(_llm_html(text))
+
     if st.session_state.get(PLAY):
         st.session_state[PLAY] = False            # 한 번만 재생 — 이후 rerun 은 마지막 장면
         dp_viz.play(tr, sel, ylabel, slot, info)
     else:
         dp_viz.still(tr, sel, ylabel, slot, info)
+
+    if fut is not None:
+        try:
+            note.html(_llm_html(fut.result(timeout=sim_explain.DEFAULT_TIMEOUT + 5)))
+        except Exception as e:
+            note.html(_llm_html(None, err=f"해설을 불러오지 못했습니다 ({type(e).__name__})"))
+
+
+def _llm_html(text: str | None, err: str | None = None) -> str:
+    if err:
+        body = f'<span class="er">{_esc(err)}</span>'
+    elif text is None:
+        body = '<span class="ld">결과를 해석하고 있습니다…</span>'
+    else:
+        body = _esc(text).replace("\n", "<br>")
+    return f'<div class="pa-llm"><span class="av">ε</span><div class="tx">{body}</div></div>'
 
 
 # ── 2) 데이터셋 기본 정책 설정 ────────────────────────────
