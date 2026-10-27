@@ -61,7 +61,7 @@ def render() -> None:
             # ── 왼쪽: [신청 대상 + 도넛] / 신청 이력 ──
             with st.container(key="rqleft", width="stretch"):
                 with st.container(horizontal=True, vertical_alignment="top",
-                                  gap="medium", wrap=False, key="rqhead"):
+                                  gap="small", wrap=False, key="rqhead"):
                     with st.container(key="rqinfo", width="content"):
                         st.markdown(design.card_head(
                             "신청 대상", f"{TL[pick]} · 통계 대상 {meas['label']}"),
@@ -71,7 +71,7 @@ def render() -> None:
                             ("ε 예산", f"{total:.2f}"),
                             ("정책 출처", src),
                         ]), unsafe_allow_html=True)
-                    with st.container(key="cbring", border=False, width=280):
+                    with st.container(key="cbring", border=False, width="content"):
                         st.markdown(design.budget_meter(spent, total, remain, size=84),
                                     unsafe_allow_html=True, width="stretch")
                 _history(user, pick)
@@ -114,13 +114,17 @@ def _levels(user: str, pick: str, risk: int) -> None:
         return
 
     rk = f"req_reason_{pick}"
+    st.html('<div class="rqhtitle rqrtitle">신청 사유</div>')   # "신청 이력"과 같은 제목 스타일
     reason = st.text_area(
         "신청 사유", placeholder=(
             f"예: {fields.SPECS[pick]['measure']['label']} 상위 구간의 중앙값을 "
             f"더 좁은 신뢰구간으로 확인해야 합니다"),
-        height=84, key=rk,
+        height=84, key=rk, label_visibility="collapsed",
     )
-    if st.button("신청 제출", type="primary", key="req_submit", width="stretch"):
+
+    with st.container(horizontal=True, horizontal_alignment="right", key="rqsubmit"):
+        submitted = st.button("신청 제출", type="primary", key="req_submit", width=140)
+    if submitted:
         if not reason.strip():
             st.toast("신청 사유를 입력하세요. 관리자 승인 판단에 쓰입니다.")
             return

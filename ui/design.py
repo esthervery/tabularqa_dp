@@ -1161,6 +1161,12 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
   margin-bottom:0 !important;                                  /* 도넛 아래 남는 여백 제거 */
 }
 
+/* 9-x. 예산 신청 — 신청 사유 제목 · 제출 버튼 */
+.stApp .st-key-rqform .rqrtitle{
+  margin:6px 0 -8px !important;      /* 제목과 입력칸 사이를 "신청 이력"처럼 붙인다 */
+}
+.stApp .st-key-rqsubmit{ margin-top:-4px !important; }   /* 입력칸과 버튼 사이 */
+
 </style>
 """
 
