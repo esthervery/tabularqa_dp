@@ -179,23 +179,13 @@ def _ensure_column(con, table: str, col: str, ddl: str) -> None:
         con.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
 
 
-def init(seed_demo: bool = True) -> None:
-    """스키마 준비 + (원한다면) 데모 계정 seed.
-
-    구버전에서 넘어올 때 새 컬럼만 add 되고 옛 컬럼은 그대로 방치된다.
-    dp_policy 는 스키마가 크게 바뀌었으므로, 실제 데모 전에는 dp_demo.db 를
-    지우고 새로 시작하는 것을 권장.
+def init() -> None:
+    """스키마 준비만 한다 (계정 생성 없음).
     """
     with connect() as con:
         con.executescript(SCHEMA)
         _ensure_column(con, "users", "eps_cap",
                        "eps_cap REAL NOT NULL DEFAULT 10.0")
-
-    if seed_demo:
-        if not user_exists("analyst"):
-            create_user("analyst", "demo1234", is_admin=False)
-        if not user_exists("admin"):
-            create_user("admin",   "admin1234", is_admin=True)
 
 
 # ── 비밀번호 파생 ────────────────────────────────
@@ -242,6 +232,22 @@ def create_user(username: str, password: str,
     except sqlite3.IntegrityError:
         return False, "이미 존재하는 아이디입니다."
     return True, "가입이 완료되었습니다."
+
+
+def set_password(username: str, password: str) -> tuple[bool, str]:
+    """기존 계정의 비밀번호를 바꾼다 (새 salt 로 다시 파생)."""
+    if len(password) < 8:
+        return False, "비밀번호는 8자 이상이어야 합니다."
+    salt = secrets.token_hex(16)
+    with connect() as con:
+        cur = con.execute(
+            "UPDATE users SET salt = ?, pw_hash = ? WHERE username = ?",
+            (salt, _derive(password, salt), username),
+        )
+        changed = cur.rowcount
+    if changed == 0:
+        return False, "존재하지 않는 계정입니다."
+    return True, "비밀번호를 변경했습니다."
 
 
 def verify(username: str, password: str):
