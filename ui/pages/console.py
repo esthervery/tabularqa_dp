@@ -354,8 +354,10 @@ def _answer(cur: str, q: str) -> None:
             raise RuntimeError("에이전트가 결과를 반환하지 않았습니다.")
         ans_s = str(ans)
         if ans_s.startswith("__CODE_ERROR__") or ans_s.startswith("__TIMEOUT__"):
-            _push(q, code=code, err=f"코드 실행 실패 · {ans_s.split(':', 1)[-1].strip()[:160]}")
-            db.log_query(user, cur, q, f"[error] {ans_s}", code=code, ok=False, eps_spent=0.0)
+            print(f"[exec-error] user={user} db={cur}: {ans_s}")   # 상세는 터미널에만
+            msg = "코드를 실행하지 못했습니다. 질문을 바꿔 다시 시도해 주세요."
+            _push(q, code=code, err=msg)
+            db.log_query(user, cur, q, f"[error] {msg}", code=code, ok=False, eps_spent=0.0)
         else:
             unit = meas.get("unit") or ""
             if st.session_state.get("is_admin"):
