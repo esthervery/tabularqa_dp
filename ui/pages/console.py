@@ -21,7 +21,8 @@ import time
 import streamlit as st
 
 from ui import agent_bridge as ab
-from ui import db, design, fields, guardrail, hints, state
+from ui import db, design, fields, guardrail, hints, state, dp_noise
+
 
 # 질의당 ε. dp_sim 은 scipy 를 요구하므로, 없어도 화면이 뜨도록 기본값을 먼저 확정한다.
 EPS = 0.1
@@ -119,7 +120,7 @@ def _inject_policies() -> None:
             continue
         s = fields.SPECS[name]
         cols = {s["measure"]["col"]:
-                "수치형 — 통계 질의 대상 (평균·중앙값·최소·최대·합계·표준편차·분위수 등)"}
+                "수치형 — 통계 질의 대상 (평균·중앙값·최댓값·최솟값과 그 차이)"}
         enum: list[str] = []
         for c in s["cat"]:
             cols[c["col"]] = ("범주형 — 고유값(종류) 열거 허용, 집단 구분 기준으로 사용 가능")
@@ -309,21 +310,14 @@ def _answer(cur: str, q: str) -> None:
     eps = float(st.session_state.get("eps") or EPS)
     meas = fields.SPECS[cur]["measure"]
 
-    # 1) 가드레일 — 통계량 질의만 통과 (fail-closed)
-    if _guardrail_on():
-        try:
-            verdict = guardrail.check(q, cur)
-            if not getattr(verdict, "allowed", True):
-                msg = (verdict.user_message() if hasattr(verdict, "user_message")
-                       else "이 질의는 통계량 질의가 아니어서 차단되었습니다.")
-                _push(q, err=msg)
-                db.log_query(user, cur, q, f"[blocked] {msg}", ok=False, eps_spent=0.0)
-                st.rerun()
-        except Exception as e:  # 판정 실패 = 차단 (fail-closed)
-            msg = f"가드레일 판정에 실패해 질의를 차단했습니다 ({type(e).__name__})."
-            _push(q, err=msg)
-            db.log_query(user, cur, q, f"[blocked] {msg}", ok=False, eps_spent=0.0)
-            st.rerun()
+    # 1) 가드레일 — 허용 여부 + 질의코드 (fail-closed)
+    #    질의코드가 없으면 노이즈 Δ 를 정할 수 없으므로, 가드레일을 끈 상태에서는 질의를 받지 않는다.
+    if not _guardrail_on():
+        _block(user, cur, q, "가드레일이 꺼져 있어 노이즈 유형을 정할 수 없습니다 — DP_GUARDRAIL 을 켜 주세요.")
+    verdict = guardrail.check(q, cur)            # 예외를 던지지 않는다 (실패는 내부에서 차단 처리)
+    if not verdict.allowed:
+        _block(user, cur, q, verdict.user_message())
+    qcode = verdict.code
 
     # 2) ε 예산
     if not state.can_spend(eps, cur):
@@ -343,7 +337,7 @@ def _answer(cur: str, q: str) -> None:
         for chunk in ab.stream_code(q, cur):
             acc += chunk
 
-        trace = st.session_state.get("_last_trace") or {}
+        trace = st.session_state.pop("_last_trace", None) or {}
         code = trace.get("code") or acc
         ans = trace.get("output")
         if ans is None:
@@ -353,8 +347,16 @@ def _answer(cur: str, q: str) -> None:
             _push(q, code=code, err=f"코드 실행 실패 · {ans_s.split(':', 1)[-1].strip()[:160]}")
             db.log_query(user, cur, q, f"[error] {ans_s}", code=code, ok=False, eps_spent=0.0)
         else:
-            _push(q, code=code, ans=ans_s, label=meas["label"])
-            state.record_query(q, ans_s, code=code, ok=True, db_name=cur)
+            try:
+                dp = dp_noise.privatize(ans, qcode, cur, eps)
+            except dp_noise.NoiseError as e:      # 노이즈를 못 붙이면 응답을 내보내지 않는다
+                _push(q, code=code, err=f"DP 노이즈를 적용하지 못해 응답을 보류했습니다 — {e}")
+                db.log_query(user, cur, q, f"[error] noise: {e}", code=code, ok=False, eps_spent=0.0)
+            else:
+                noisy = str(dp["value"])
+                _push(q, code=code, ans=noisy, label=meas["label"])
+                state.record_query(q, noisy, code=code, ok=True, db_name=cur)
+
     except ab.PipelineUnavailable as e:
         msg = f"에이전트 파이프라인을 사용할 수 없습니다 — {e.reason}"
         _push(q, err=msg)
@@ -366,6 +368,13 @@ def _answer(cur: str, q: str) -> None:
     finally:
         box.empty()
 
+    st.rerun()
+
+
+def _block(user: str, cur: str, q: str, msg: str) -> None:
+    """차단 — 화면에 남기고 감사 기록(ε 0)을 쓴 뒤 리런한다."""
+    _push(q, err=msg)
+    db.log_query(user, cur, q, f"[blocked] {msg}", ok=False, eps_spent=0.0)
     st.rerun()
 
 
