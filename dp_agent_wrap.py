@@ -34,6 +34,8 @@ import core.postprocessors as postprocessors
 import core.prompt_generators as prompt_generators
 import core.utils as utils
 
+import code_guard
+
 # main.py 와 동일한 exemplar 선택
 EXEMPLAR_INDICES = [(17, 140), (0, 132), (28, 286), (31, 303), (4, 246),
                     (24, 175), (20, 176), (8, 141), (14, 12)]
@@ -202,18 +204,28 @@ class InlineStatementExecutor(executors.Executor):
 
     def __call__(self, inp):
         statement, dataset = inp
+        code = "def answer(df):\n" + statement + "\n"
+
+        # 실행 전 코드 검사
+        try:
+            code_guard.check(code)
+        except SyntaxError as e:ㄴ
+            return f"__CODE_ERROR__: SyntaxError: {e.msg}"
+        except code_guard.CodeGuardError as e:
+            print(f"[code-guard] blocked dataset={dataset}: {e}", flush=True)
+            return f"__CODE_ERROR__: CodeGuardError: {e}"
+
         try:
             df = self.loader(dataset)
         except Exception as e:
             return f"__CODE_ERROR__: table load failed: {e}"
 
-        code = "def answer(df):\n" + statement + "\n"
         box = {}
 
         def work():
             try:
-                ns = {"pd": pd, "np": np, "ast": ast}
-                exec(code, ns, ns)
+                ns = code_guard.namespace(pd=pd, np=np, ast=ast)
+                exec(compile(code, "<agent>", "exec"), ns, ns)
                 box["ans"] = ns["answer"](df)
             except Exception as e:
                 box["err"] = f"__CODE_ERROR__: {type(e).__name__}: {e}"
@@ -226,6 +238,7 @@ class InlineStatementExecutor(executors.Executor):
         if "err" in box:
             return box["err"]
         return box.get("ans")
+
 
     def __str__(self):
         return (f"InlineStatementExecutor(Executor)\n\tloader: {self.loader}"
