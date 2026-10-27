@@ -71,7 +71,7 @@ def render() -> None:
                             ("ε 예산", f"{total:.2f}"),
                             ("정책 출처", src),
                         ]), unsafe_allow_html=True)
-                    with st.container(key="cbring", border=True, width=250):
+                    with st.container(key="cbring", border=False, width=280):
                         st.markdown(design.budget_meter(spent, total, remain, size=84),
                                     unsafe_allow_html=True, width="stretch")
                 _history(user, pick)
@@ -143,7 +143,7 @@ def _history(user: str, pick: str) -> None:
             if r.get("db_name") == pick][:HIST_MAX]
     head = f'<div class="rqhtitle">신청 이력<span>{len(rows)}건</span></div>'
     if not rows:
-        st.html(head + '<div class="rqhempty">아직 신청 이력이 없습니다</div>')
+        st.html(head + '<div class="pa-empty rqempty">아직 신청 이력이 없습니다</div>')
         return
 
     grid = "grid-template-columns:84px 108px minmax(0,1fr) 60px"

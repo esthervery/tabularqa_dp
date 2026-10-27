@@ -1136,6 +1136,31 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
   margin-top:-6px !important;
 }
 
+/* 9-x. 예산 신청 — 신청 이력 빈 영역 (프라이버시 분석 pa-empty 재사용) */
+.stApp .rqempty{
+  margin:6px 0 0 !important;
+  min-height:84px !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
+}
+
+/* 9-x. 예산 신청 — 도넛 테두리 제거 · 그래프+글자 확대 */
+.stApp .st-key-cbring{
+  border:none !important; box-shadow:none !important;
+  background:transparent !important;
+  padding:0 !important;
+}
+.stApp .st-key-cbring [data-testid="stMarkdownContainer"] > div{
+  zoom:1.15;                                  /* 그래프와 글자를 같은 비율로 확대 */
+}
+
+/* 9-x. 예산 신청 — 신청 이력 위 여백 축소 */
+.stApp .st-key-rqleft{ gap:4px !important; }                 /* 기본 16px → 4px */
+.stApp .st-key-rqleft .rqhtitle{ margin-top:6px !important; } /* 기존 14px → 6px */
+.stApp .st-key-cbring [data-testid="stMarkdownContainer"],
+.stApp .st-key-cbring [data-testid="stMarkdownContainer"] > div{
+  margin-bottom:0 !important;                                  /* 도넛 아래 남는 여백 제거 */
+}
+
 </style>
 """
 
