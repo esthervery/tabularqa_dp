@@ -279,6 +279,33 @@ def verify(username: str, password: str):
     }
 
 
+def change_password(username: str, current: str, new: str) -> tuple[bool, str]:
+    """본인 비밀번호 변경. 현재 비밀번호가 맞아야 바꾼다."""
+    if not current or not new:
+        return False, "비밀번호를 모두 입력하세요."
+    if len(new) < 8:
+        return False, "새 비밀번호는 8자 이상이어야 합니다."
+    if new == current:
+        return False, "현재 비밀번호와 다른 비밀번호를 입력하세요."
+
+    with connect() as con:
+        row = con.execute(
+            "SELECT salt, pw_hash FROM users WHERE username = ?", (username,)
+        ).fetchone()
+    if row is None:
+        return False, "계정을 찾을 수 없습니다."
+    if not hmac.compare_digest(_derive(current, row["salt"]), row["pw_hash"]):
+        return False, "현재 비밀번호가 일치하지 않습니다."
+
+    salt = secrets.token_hex(16)              # 바꿀 때마다 salt 도 새로
+    with connect() as con:
+        con.execute(
+            "UPDATE users SET salt = ?, pw_hash = ? WHERE username = ?",
+            (salt, _derive(new, salt), username),
+        )
+    return True, "비밀번호를 변경했습니다."
+
+
 def get_eps_cap(username: str) -> float:
     """개인 상한 조회 (users.eps_cap)."""
     with connect() as con:

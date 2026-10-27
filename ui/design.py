@@ -1167,6 +1167,36 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 }
 .stApp .st-key-rqsubmit{ margin-top:-4px !important; }   /* 입력칸과 버튼 사이 */
 
+/* 계정 버튼 — 기존 navuser 모양 유지 + 클릭 가능 */
+.stApp div[class*="st-key-nav_user"] button{
+  height:auto !important; min-height:0 !important;
+  padding:4px 10px 4px 5px !important;
+  border:1px solid transparent !important; border-radius:10px !important;
+  background:transparent !important;
+}
+.stApp div[class*="st-key-nav_user"] button:hover{
+  background:var(--prisoft) !important; border-color:var(--priline) !important;
+}
+.stApp div[class*="st-key-nav_user"] button p{
+  display:grid !important; grid-template-columns:28px auto;
+  column-gap:8px; align-items:center; text-align:left !important;
+  margin:0 !important; font-size:12.5px !important; font-weight:700 !important;
+  line-height:1.2 !important;
+}
+.stApp div[class*="st-key-nav_user"] button p::before{
+  grid-row:1 / span 2; width:28px; height:28px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--prisoft); color:var(--pri2);
+  font-size:10px; font-weight:700;
+}
+.stApp div[class*="st-key-nav_user"] button p::after{
+  grid-column:2; font-size:10px; font-weight:500; color:var(--muted, #8b90a0);
+}
+.stApp .st-key-nav_user_an button p::before{ content:"AN"; }
+.stApp .st-key-nav_user_an button p::after { content:"Analyst"; }
+.stApp .st-key-nav_user_ad button p::before{ content:"AD"; }
+.stApp .st-key-nav_user_ad button p::after { content:"Admin"; }
+
 </style>
 """
 

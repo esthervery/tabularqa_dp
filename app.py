@@ -138,6 +138,31 @@ def _ds_label(k: str) -> str:
     return "전체 데이터셋" if k == ALL_DS else f"{fields.SPECS[k]['title']}  ·  {k}"
 
 
+PW_FLASH = "pw_flash"
+
+
+@st.dialog("비밀번호 변경", width="small")
+def _pw_dialog() -> None:
+    st.caption(f"{USER} · {ROLE_LABEL}")
+    with st.form("pw_form", border=False):
+        cur = st.text_input("현재 비밀번호", type="password", key="pw_cur")
+        new = st.text_input("새 비밀번호", type="password", key="pw_new",
+                            help="8자 이상")
+        new2 = st.text_input("새 비밀번호 확인", type="password", key="pw_new2")
+        ok = st.form_submit_button("변경", type="primary", width="stretch")
+    if not ok:
+        return
+    if new != new2:
+        st.error("새 비밀번호가 서로 일치하지 않습니다.")
+        return
+    success, msg = db.change_password(USER, cur, new)
+    if not success:
+        st.error(msg)
+        return
+    st.session_state[PW_FLASH] = msg
+    st.rerun()                                # 대화상자 닫힘
+
+
 def _ds_picker() -> None:
     """데이터셋 선택기 — mode="none"(프라이버시 분석)일 때만 자리를 비운다."""
     if DS_MODE == "none":
@@ -206,12 +231,9 @@ with st.container(horizontal=True, wrap=False, vertical_alignment="center",
                       vertical_alignment="center", gap="small", key="navbar"):
         _ds_picker()
         st.html('<div class="navsep"></div>', width="content")
-        st.html(
-            '<div class="navuser"><div class="av">'
-            + ("AD" if IS_ADMIN else "AN") + "</div>"
-            '<div class="u"><b>' + USER + "</b><span>" + ROLE_LABEL + "</span></div></div>",
-            width="content",
-        )
+        if st.button(USER, key=("nav_user_ad" if IS_ADMIN else "nav_user_an"),
+                     type="tertiary", help="비밀번호 변경"):
+            _pw_dialog()
         if st.button("로그아웃", key="nav_logout", type="tertiary"):
             boot.discard()
             state.logout()
@@ -224,6 +246,8 @@ if _missing:
                 unsafe_allow_html=True)
 
 st.markdown('<div class="navrule"></div>', unsafe_allow_html=True)
+if (_m := st.session_state.pop(PW_FLASH, None)):
+    st.toast(_m, icon=":material/check_circle:", duration="short")
 
 
 # ══ 본문 ══════════════════════════════════════════════
