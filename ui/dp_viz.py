@@ -26,8 +26,10 @@ from ui import dp_sim
 
 # ── 조절값 ──────────────────────────────────────
 QUERIES_PER_FRAME = 2        # 프레임당 늘어나는 질의 수 (작을수록 촘촘·길어짐)
-FRAME_INTERVAL_S  = 0.2      # 프레임 간격(초) (작을수록 빨라짐, 렌더 시간보다 작게는 의미 없음)
-FIG_W, FIG_H, DPI = 9.0, 3.0, 110     # 세로 약 300px
+FRAME_INTERVAL_S  = 0.2      # 프레임 간격(초) (작을수록 빨라짐, 렌더 시간보다 작게는 의미 없음)    
+FIG_W, FIG_H = 5.6, 2.5   # 그림 비율(인치). 표시 폭은 아래 SIM_COLS 가 정한다
+FIG_DPI      = 200        # 작게 표시해도 글자가 선명하도록
+SIM_COLS     = [11, 9]    # 그래프 : 수치 패널 → 그래프가 카드 폭의 약 55%
 
 PRI, SUC, DOT = "#6366f1", "#10b981", "#94a3b8"
 INK, MID, GRID = "#334155", "#64748b", "#e2e8f0"
@@ -59,7 +61,7 @@ def _ylim(tr: "dp_sim.Trace") -> tuple[float, float]:
 
 def _frame(tr, k_now: int, k_tot: int, ylim, ylabel: str) -> bytes:
     ks = np.arange(1, k_now + 1)
-    fig, ax = plt.subplots(figsize=(FIG_W, FIG_H), dpi=DPI)
+    fig, ax = plt.subplots(figsize=(FIG_W, FIG_H), dpi=FIG_DPI)
     fig.subplots_adjust(left=0.08, right=0.985, top=0.95, bottom=0.30)   # 고정 → 프레임 간 흔들림 없음
 
     ax.fill_between(ks, tr.ci_los[:k_now], tr.ci_his[:k_now],
@@ -93,7 +95,7 @@ def _frame(tr, k_now: int, k_tot: int, ylim, ylabel: str) -> bytes:
             fontsize=8.5, color=INK, linespacing=1.5,
             bbox=dict(boxstyle="round,pad=0.5", fc="white", ec=GRID))
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.24), ncol=4,
-              frameon=False, fontsize=8.5, labelcolor=INK)
+              frameon=False, fontsize=7.5, labelcolor=INK)
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png")       # bbox_inches='tight' 금지 — 프레임마다 크기가 달라져 흔들린다
