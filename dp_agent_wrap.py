@@ -209,7 +209,7 @@ class InlineStatementExecutor(executors.Executor):
         # 실행 전 코드 검사
         try:
             code_guard.check(code)
-        except SyntaxError as e:ㄴ
+        except SyntaxError as e:
             return f"__CODE_ERROR__: SyntaxError: {e.msg}"
         except code_guard.CodeGuardError as e:
             print(f"[code-guard] blocked dataset={dataset}: {e}", flush=True)
