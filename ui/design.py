@@ -1206,6 +1206,42 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
   color:var(--ink, #1f2330); font-size:13px; line-height:1.6;
 }
 
+/* ── 로그인: 탭 줄 오른쪽 '개인정보 처리방침' 링크 ── */
+.st-key-lgpolicy{
+  height:40px;                              /* 탭 줄 높이 */
+  margin-bottom:calc(-1rem - 40px);         /* 기본 간격(1rem) + 자기 높이만큼 끌어내려 탭 줄과 겹침 */
+  position:relative; z-index:3;             /* 탭 줄보다 위 → 클릭 가능 */
+  pointer-events:none;                      /* 빈 영역은 탭 클릭을 막지 않음 */
+}
+.st-key-lgpolicy button{
+  pointer-events:auto;
+  min-height:0; height:26px; padding:0 2px;
+  color:#64748b; background:transparent;
+}
+.st-key-lgpolicy button p{font-size:12px; font-weight:500}
+.st-key-lgpolicy button:hover{color:var(--pri2,#6366f1); text-decoration:underline; text-underline-offset:3px}
+
+/* ── 개인정보 처리방침 화면 ── */
+.st-key-pp_back_top button{min-height:0; padding:0; color:#64748b}
+.st-key-pp_back_top button:hover{color:var(--pri2,#6366f1)}
+.st-key-pp_card{padding:28px 32px}
+.pp-head{display:flex; align-items:baseline; justify-content:space-between;
+  padding-bottom:14px; border-bottom:1px solid #e2e8f0}
+.pp-head h2{margin:0; padding:0; font-size:20px; font-weight:700; color:#0f172a}
+.pp-head span{font-size:11.5px; color:#94a3b8}
+.pp-sec h3{margin:6px 0 10px; padding:0; font-size:15px; font-weight:700; color:#0f172a}
+.pp-sec h4{margin:16px 0 4px; padding:0; font-size:13.5px; font-weight:600; color:#334155}
+.pp-sec p{margin:0; font-size:13px; line-height:1.7; color:#475569}
+.pp-tbl{width:100%; border-collapse:collapse; font-size:12.5px; line-height:1.6}
+.pp-tbl thead th{background:#f8fafc; color:#64748b; font-weight:600; text-align:left;
+  padding:8px 12px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0}
+.pp-tbl tbody th, .pp-tbl tbody td{padding:10px 12px; border-bottom:1px solid #f1f5f9;
+  vertical-align:top; text-align:left; color:#475569}
+.pp-tbl tbody th{width:18%; font-weight:600; color:#0f172a; white-space:nowrap}
+.pp-tbl tbody td:last-child{width:32%}
+.pp-sec .pp-foot{margin-top:10px; font-size:11.5px; color:#94a3b8}
+.pp-sec .pp-warn{margin-top:4px; font-size:11.5px; color:#b45309}
+
 </style>
 """
 

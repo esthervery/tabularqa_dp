@@ -15,6 +15,13 @@ from ui.security import login_guard
 import math
 
 
+VIEW = "auth_view"   # 로그인 전 화면 전환: "login" | "privacy"
+
+
+def _to_privacy() -> None:
+    st.session_state[VIEW] = "privacy"
+
+
 def render_login() -> None:
     st.markdown("<div style='height:4vh'></div>", unsafe_allow_html=True)
 
@@ -30,6 +37,11 @@ def render_login() -> None:
                                  "계정으로 로그인하면 질의 콘솔로 이동합니다."),
                 unsafe_allow_html=True,
             )
+            # 탭 줄 오른쪽 끝에 놓이는 텍스트 링크 (CSS 로 탭 줄 높이에 맞춤)
+            with st.container(horizontal=True, horizontal_alignment="right",
+                              vertical_alignment="center", key="lgpolicy"):
+                st.button("개인정보 처리방침", key="lg_policy", type="tertiary",
+                          on_click=_to_privacy)
             tab_in, tab_up = st.tabs(["로그인", "회원가입"])
             with tab_in:
                 _render_login_form()

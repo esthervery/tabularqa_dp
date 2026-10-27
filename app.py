@@ -25,7 +25,7 @@ from pathlib import Path
 import streamlit as st
 from ui import db, design, fields
 from ui.dputils import state
-from ui.pages import auth
+from ui.pages import auth, privacy_policy
 from ui.utils import boot
 
 db.init()
@@ -51,7 +51,10 @@ if not authed:
     design.inject()
     _c = st.columns([0.16, 0.68, 0.16])
     with _c[1]:
-        auth.render_login()
+        if st.session_state.get(auth.VIEW) == "privacy":
+            privacy_policy.render()
+        else:
+            auth.render_login()
     st.stop()
 
 
