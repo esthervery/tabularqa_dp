@@ -788,6 +788,7 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
   background:var(--pri) !important; border-color:var(--pri) !important; color:#fff !important;
   box-shadow:0 2px 6px rgba(99,102,241,.28) !important;
 }
+.stApp .st-key-pa_head{ margin-bottom:-10px !important; }   /* 버튼 줄 ↔ 숫자 줄 간격 */
 
 /* 시뮬레이션 영역 */
 .pa-div{ height:1px; background:var(--bd2); margin:6px 0 10px; }
@@ -1168,7 +1169,7 @@ def login_hero() -> str:
   코드의 결과만 차분 프라이버시 보호 아래 받아봅니다.</p>
   <div class="bl"><div class="n">1</div><div class="t"><b>자연어 질의</b>
     <span>프라이버시적으로 안전한 필드 정보를 통해 통계량을 질문합니다.</span></div></div>
-  <div class="bl"><div class="n">2</div><div class="t"><b>ε 예산 원장</b>
+  <div class="bl"><div class="n">2</div><div class="t"><b>ε 예산 관리</b>
     <span>질의마다 소비된 ε 을 데이터셋별 리스크 정책과 함께 추적합니다.</span></div></div>
   <div class="bl"><div class="n">3</div><div class="t"><b>관리자 결재</b>
     <span>예산이 부족하면 사유와 함께 리스크 레벨 상향을 요청합니다.</span></div></div>

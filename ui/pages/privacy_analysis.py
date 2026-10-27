@@ -116,12 +116,13 @@ def _matrix(name: str, spec: dict, tr) -> None:
             f"통계 대상({m['label']}) 평균값을 Utility별 허용 횟수만큼 반복 질의했을 때의 "
             "최종 95% 신뢰구간 폭"), unsafe_allow_html=True)
 
-        head = st.columns(COLS, gap="small", vertical_alignment="center")
-        for i, r in enumerate(RISKS, 1):
-            with head[i]:
-                st.button(f"Utility {r}",
-                          key=f"pa_uton_{r}" if sel == r else f"pa_ut_{r}",
-                          on_click=_pick, args=(r,), width="stretch")
+        with st.container(key="pa_head"):
+            head = st.columns(COLS, gap="small", vertical_alignment="center")
+            for i, r in enumerate(RISKS, 1):
+                with head[i]:
+                    st.button(f"Utility {r}",
+                              key=f"pa_uton_{r}" if sel == r else f"pa_ut_{r}",
+                              on_click=_pick, args=(r,), width="stretch")
 
         row = st.columns(COLS, gap="small", vertical_alignment="center")
         row[0].markdown(
@@ -144,7 +145,7 @@ def _cell(v: float, wmax: float, k: int, on: bool) -> str:
 
 def _sim(spec: dict, tr, sel: int | None) -> None:
     if sel is None:
-        st.markdown('<div class="pa-empty">시뮬레이션을 위해서, 유틸리티 버튼을 눌러주세요</div>',
+        st.markdown('<div class="pa-empty">유틸리티 버튼을 눌러 프라이버시 리스크를 시뮬레이션하세요</div>',
                     unsafe_allow_html=True)
         return
 
@@ -197,8 +198,9 @@ def _status(name: str) -> None:
     """3) 데이터셋 별 정책 현황 — 별도 카드."""
     with st.container(border=True, key="card_policies"):
         st.markdown(design.card_head(
-            "데이터셋 별 정책 현황",
-            "수동 = 관리자 확정 · 자동 = 확정 기록 없음(시스템 기본값)"), unsafe_allow_html=True)
+            "데이터셋 별 정책 현황"),
+            # "수동 = 관리자 확정 · 자동 = 확정 기록 없음(시스템 기본값)"), 
+            unsafe_allow_html=True)
         _policies(name)
 
 
