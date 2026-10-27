@@ -1215,11 +1215,17 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 }
 .st-key-lgpolicy button{
   pointer-events:auto;
-  min-height:0; height:26px; padding:0 2px;
-  color:#64748b; background:transparent;
+  min-height:0 !important; height:26px; padding:0 2px !important;  /* 컴팩트 크기 복원 */
+  border:none !important;                     /* 윤곽선(테두리) 제거 */
+  background:transparent !important; box-shadow:none;
+  color:var(--pri) !important;                /* 시그니처 보라 (#6366f1) */
+  transform:translateY(6px);                  /* 살짝 아래로 이동 */
 }
-.st-key-lgpolicy button p{font-size:12px; font-weight:500}
-.st-key-lgpolicy button:hover{color:var(--pri2,#6366f1); text-decoration:underline; text-underline-offset:3px}
+.st-key-lgpolicy button p{font-size:12px; font-weight:500}   /* 글씨 굵게 */
+.st-key-lgpolicy button:hover{
+  color:var(--pri2) !important; background:transparent !important;
+  text-decoration:underline; text-underline-offset:3px;
+}
 
 /* ── 개인정보 처리방침 화면 ── */
 .st-key-pp_back_top button{min-height:0; padding:0; color:#64748b}
