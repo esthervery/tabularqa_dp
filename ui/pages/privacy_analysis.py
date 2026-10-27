@@ -34,6 +34,7 @@ COLS = [1.6, 1, 1, 1, 1, 1]               # 데이터셋 | U1..U5 — 머리줄�
 EPS_Q = 0.1
 
 SEL, PLAY, DS, FLASH = "pa_sel", "pa_play", "pa_ds", "pa_flash"
+OPEN = "pa_open"                          # 시뮬레이션 영역 펼침 여부
 
 
 # ── 상태 ───────────────────────────────────────────────
@@ -54,6 +55,13 @@ def _pick(r: int) -> None:
     st.session_state[SEL] = r
     st.session_state[PLAY] = True
     st.session_state["pol_lv"] = r                # 정책 선택칸 연동
+    st.session_state[OPEN] = True                 # 접혀 있어도 Utility 를 누르면 다시 펼친다
+
+
+def _toggle() -> None:
+    """시뮬레이션 영역 접기 / 펼치기 — Utility 선택은 유지한다."""
+    st.session_state[OPEN] = not st.session_state.get(OPEN, True)
+    st.session_state[PLAY] = False        # 펼칠 때는 마지막 장면만 보여준다 (재생은 ↻ 버튼)
 
 
 def _replay() -> None:
@@ -168,19 +176,29 @@ def _sim(spec: dict, tr, sel: int | None) -> None:
     m = spec["measure"]
     ylabel = m["label"] + (f" ({m['unit']})" if m.get("unit") else "")
 
-    top = st.columns([1, 0.2], vertical_alignment="center")
+    top = st.columns([1, 0.1], vertical_alignment="center")
     top[0].markdown(
         f'<div class="pa-simhead"><b>Utility {sel}</b>'
         f'<span>총 ε {eps:g} · 질의당 ε {dp_sim.EPS_PER_QUERY:g} · 평균 질의 {k}회 반복</span></div>',
         unsafe_allow_html=True)
+    opened = st.session_state.get(OPEN, True)
     with top[1]:
-        st.button("↻ 다시 재생", key="pa_replay", on_click=_replay, width="stretch")
+        with st.container(key="pa_closewrap", horizontal=True,
+                          horizontal_alignment="right"):        # 칸 오른쪽 끝으로
+            st.button(":material/expand_less:" if opened else ":material/expand_more:",
+                      key="pa_close", on_click=_toggle,
+                      help="접기" if opened else "펼치기", width="content")
+    if not opened:                        # 접힘 — 제목 줄과 버튼만 남긴다
+        return
+
 
     if dp_viz.KO_FONT is None:
         st.caption("한글 글꼴을 찾지 못해 그래프 글자가 깨질 수 있습니다 (맑은 고딕 · 나눔고딕 설치 필요).")
 
     g_col, s_col = st.columns(dp_viz.SIM_COLS, gap="medium", vertical_alignment="center")
-    slot = g_col.empty()
+    with g_col:
+        slot = st.empty()          # 그래프
+        st.button("↻ 다시 재생", key="pa_replay", on_click=_replay)   # 그래프 바로 아래
     with s_col:
         info = st.empty()          # 수치 패널
         note = st.empty()          # LLM 해설
@@ -213,7 +231,7 @@ def _llm_html(text: str | None, err: str | None = None) -> str:
     if err:
         body = f'<span class="er">{_esc(err)}</span>'
     elif text is None:
-        body = '<span class="ld">결과를 해석하고 있습니다…</span>'
+        body = '<span class="ld"><i class="spin"></i>결과를 해석하고 있습니다…</span>'
     else:
         body = _esc(text).replace("\n", "<br>")
     return f'<div class="pa-llm"><span class="av">ε</span><div class="tx">{body}</div></div>'

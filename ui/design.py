@@ -1104,6 +1104,38 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 }
 .stApp .st-key-card_policies .pmode{ padding:1px 7px !important; font-size:10.5px !important; }
 
+/* 11-x. 프라이버시 분석 — LLM 해설 로딩 (도는 링 + 세미 볼드) */
+.stApp .pa-llm .ld{
+  display:inline-flex !important; align-items:center; gap:8px;
+  font-weight:600 !important; color:var(--ink2) !important;
+}
+.stApp .pa-llm .ld .spin{
+  flex:0 0 auto; width:14px; height:14px; border-radius:50%;
+  border:2px solid var(--priline);
+  border-top-color:var(--pri);
+  animation:pa-spin .8s linear infinite;
+}
+@keyframes pa-spin{ to{ transform:rotate(360deg); } }
+
+/* 11-x. 프라이버시 분석 — 시뮬레이션 닫기 · 다시 재생 위치 */
+.stApp .st-key-pa_closewrap{ justify-content:flex-end !important; }
+.stApp .st-key-pa_close button{
+  width:30px !important; height:30px !important; min-height:30px !important;
+  padding:0 !important; border-radius:8px !important;
+  border:1px solid transparent !important; background:transparent !important;
+  color:var(--mid) !important; box-shadow:none !important;
+}
+.stApp .st-key-pa_close button:hover{
+  background:var(--prisoft) !important; border-color:var(--priline) !important;
+  color:var(--pri2) !important;
+}
+.stApp .st-key-pa_close [data-testid="stIconMaterial"]{ font-size:18px !important; }
+
+.stApp .st-key-pa_replay{
+  display:flex !important; justify-content:center !important;   /* 그래프 가운데 아래 */
+  margin-top:-6px !important;
+}
+
 </style>
 """
 
