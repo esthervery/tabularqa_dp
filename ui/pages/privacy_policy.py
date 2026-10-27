@@ -70,7 +70,7 @@ def _table_html() -> str:
         f'<tbody>{rows}</tbody>'
         '</table>'
         '<p class="pp-foot">법적 근거: 서비스 이용 계약의 이행(개인정보 보호법 제15조 제1항 제4호)'
-        f' · 보관 기간: {RETENTION}</p>'
+        # f' · 보관 기간: {RETENTION}</p>'
         '<p class="pp-warn">※ 질문과 신청 사유에는 이름, 연락처 같은 개인정보를 입력하지 마세요.</p>'
         '</div>'
     )
