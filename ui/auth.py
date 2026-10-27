@@ -9,7 +9,8 @@ Renders (위→아래):
   - 하단      : 저작권/빌드 표시
 """
 import streamlit as st
-from ui import db, design, state
+from ui import db, design, login_guard, state
+import math
 
 
 def render_login() -> None:
@@ -42,15 +43,25 @@ def render_login() -> None:
 def _render_login_form() -> None:
     """로그인 탭 폼. 성공 시 세션 채우고 rerun."""
     with st.form("login", clear_on_submit=False, border=False):
-        u = st.text_input("아이디", value="analyst")
-        p = st.text_input("비밀번호", type="password", placeholder="8자 이상")
+        u = st.text_input("아이디")
+        p = st.text_input("비밀번호", type="password", placeholder="영문 대문자·소문자·숫자·특수문자 중 3종류 이상 조합, 10자 이상")
         submitted = st.form_submit_button(
             "로그인", type="primary", use_container_width=True,
         )
         if not submitted:
             return
 
+        wait = login_guard.locked_for(u)
+        if wait:
+            st.error(f"로그인 시도가 너무 많습니다. {math.ceil(wait / 60)}분 후 다시 시도하세요.")
+            return
         user = db.verify(u, p)
+        if user is None:
+            login_guard.fail(u)
+            st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
+            return
+        login_guard.success(u)
+
         if not user:
             st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
             return
