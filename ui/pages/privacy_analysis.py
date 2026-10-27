@@ -1,18 +1,16 @@
-"""프라이버시 분석 (관리자) — 리스크 레벨별 신뢰구간 수렴.
-
-관리자가 데이터셋 × 리스크 레벨의 DP 보장 수준을 비교하고,
-데이터셋별 기본 정책을 [확정] 하는 곳.
+"""프라이버시 분석 (관리자) — Utility 레벨별 신뢰구간 수렴 시뮬레이션 · 기본 정책 확정.
 
 Renders (위→아래):
-    1) 페이지 제목
-    2) 매트릭스 카드 : 데이터셋(행) × Risk 1~5(열) 최종 95% CI 폭 + 막대 + 축소 배율
-    3) 정책 확정 카드 : 데이터셋 · 리스크 · 메모 · [확정] + 최근 확정 이력 표
+    1) 프라이버시 리스크 분석 카드
+       · 열 제목 = Utility 1~5 버튼 (누르면 시뮬레이션 재생 + 아래 정책 선택칸 연동)
+       · 셀 = 통계 대상 평균을 허용 횟수 k 만큼 반복 질의했을 때의 최종 95% CI 폭
+       · 표 아래 = 시뮬레이션 영역 (안내 문구 → 버튼 클릭 시 수렴 애니메이션)
+    2) 데이터셋 기본 정책 설정 카드
+       · Utility · 메모 · [확정]
+       · 데이터셋별 적용 정책 표 (수동 = 관리자 확정 / 자동 = 확정 없음 → 시스템 기본값)
 
-계산은 ui/dp_sim.py 의 simulate() 를 그대로 쓴다 (라플라스 노이즈 시뮬레이션).
-값 노출 규칙 — 이 화면에도 원본 값은 올리지 않는다.
-    표시  : 리스크별 최종 95% CI 폭, 필요 라운드 수 k
-    금지  : 참 평균·최소·최대·개별 응답
-(로직은 demo 브랜치 원본과 동일 — 레이아웃·스타일만 변경)
+계산: ui/dp_sim.trace() — 데이터셋당 노이즈 응답 100개를 한 번 만들고 Utility 별로 앞 k 개를 쓴다.
+관리자 전용 화면이므로 참 평균 · 실제 값 축을 그대로 보여준다.
 """
 from __future__ import annotations
 
@@ -21,153 +19,223 @@ import streamlit as st
 from ui import db, design, fields
 
 try:
-    from ui import dp_sim
+    from ui import dp_sim, dp_viz
     _SIM_ERR = None
-except Exception as _e:   # scipy 미설치 등 — 화면은 뜨고 안내만 남긴다
-    dp_sim = None
+except Exception as _e:   # scipy · matplotlib 미설치 등 — 화면은 뜨고 안내만 남긴다
+    dp_sim = dp_viz = None
     _SIM_ERR = f"{type(_e).__name__}: {_e}"
 
 RISKS = [1, 2, 3, 4, 5]
+COLS = [1.6, 1, 1, 1, 1, 1, 0.7]          # 데이터셋 | U1..U5 | 축소 — 머리줄·값줄 공통
+EPS_Q = 0.1
+
+SEL, PLAY, DS, FLASH = "pa_sel", "pa_play", "pa_ds", "pa_flash"
 
 
-def _ensure_targets() -> None:
-    for name, spec in fields.SPECS.items():
-        if spec.get("enabled"):
-            dp_sim.SIM_TARGET.setdefault(name, spec["measure"]["col"])
+# ── 상태 ───────────────────────────────────────────────
 
+def _sync(name: str) -> None:
+    """데이터셋이 바뀌면 선택 · 재생 · 정책칸을 초기화한다."""
+    if st.session_state.get(DS) != name:
+        st.session_state[DS] = name
+        st.session_state[SEL] = None
+        st.session_state[PLAY] = False
+        st.session_state.pop("pol_lv", None)
+        st.session_state.pop("pol_note", None)
+    if "pol_lv" not in st.session_state:          # 다른 페이지 다녀오면 위젯 상태가 지워진다
+        st.session_state["pol_lv"] = int(db.get_active_policy(name)["risk_level"])
+
+
+def _pick(r: int) -> None:
+    st.session_state[SEL] = r
+    st.session_state[PLAY] = True
+    st.session_state["pol_lv"] = r                # 정책 선택칸 연동
+
+
+def _replay() -> None:
+    st.session_state[PLAY] = True
+
+
+def _do_confirm(admin: str, ds: str) -> None:
+    lv = int(st.session_state.get("pol_lv") or 1)
+    note = (st.session_state.get("pol_note") or "").strip()
+    try:
+        db.confirm_policy(admin, ds, lv, note or None)
+        st.session_state[FLASH] = f"{ds} 기본 정책을 Utility {lv} 로 확정했습니다."
+        st.session_state["pol_note"] = ""
+    except Exception as e:
+        st.session_state[FLASH] = f"확정하지 못했습니다 ({type(e).__name__}: {e})"
+
+
+# ── 화면 ───────────────────────────────────────────────
 
 def render() -> None:
     design.inject()
-    # st.markdown(design.page_hero(
-    #     "프라이버시 분석",
-    #     "리스크 레벨별 95% 신뢰구간 폭 — 낮은 레벨일수록 프라이버시가 강하고 결과가 거칩니다."),
-    #     unsafe_allow_html=True)
 
-    if dp_sim is None:
-        st.markdown(design.warn("시뮬레이터를 불러오지 못했습니다 — scipy 설치가 필요합니다 "
-                                f"({_SIM_ERR})"), unsafe_allow_html=True)
-        return
-    _ensure_targets()
+    msg = st.session_state.pop(FLASH, None)
+    if msg:
+        st.toast(msg, duration="short")
 
-    # 분석 대상 = 상단 바에서 고른 데이터셋 하나 ('전체' 없음)
     name = st.session_state.get("db_name")
     spec = fields.SPECS.get(name) or {}
     if not spec.get("enabled"):
         st.markdown(design.empty("분석할 데이터셋을 상단에서 선택하세요"), unsafe_allow_html=True)
         return
+    _sync(name)
 
-    widths, k, errors = {}, None, []
-    for r in RISKS:
+    if dp_sim is None:
+        st.markdown(design.warn("시뮬레이터를 불러오지 못했습니다 — scipy · matplotlib 설치가 필요합니다 "
+                                f"({_SIM_ERR})"), unsafe_allow_html=True)
+    else:
         try:
-            res = dp_sim.simulate(name, r)
-            widths[r] = float(res.stop_ci_hi - res.stop_ci_lo)
-            k = int(res.k)
+            tr = dp_sim.trace(name)
         except Exception as e:
-            errors.append(f"Utility {r}: {type(e).__name__}: {e}")
+            tr = None
+            st.markdown(design.warn(f"시뮬레이션을 계산하지 못했습니다 — {type(e).__name__}: {e}"),
+                        unsafe_allow_html=True)
+        if tr is not None:
+            _matrix(name, spec, tr)
 
-    if errors:
-        st.markdown(design.warn("일부 시뮬레이션을 계산하지 못했습니다 — " + "; ".join(errors[:3])),
-                    unsafe_allow_html=True)
-
-    if not widths:
-        st.markdown(design.empty("이 데이터셋의 시뮬레이션 결과가 없습니다"), unsafe_allow_html=True)
-        return
-
-    row = {"name": name, "title": spec["title"], "widths": widths,
-           "k": k, "measure": spec["measure"]}
-    _matrix([row])      # 표 함수는 그대로 — 행이 1개만 들어간다
-    _confirm(row)
+    _confirm(name, spec)
 
 
-# ── 매트릭스 ────────────────────────────────────────────
+# ── 1) 프라이버시 리스크 분석 ─────────────────────────────
 
-def _matrix(rows: list[dict]) -> None:
-    """데이터셋(행) × 리스크(열) CI 폭 표. 셀은 막대로도 보여준다."""
-    all_w = [w for r in rows for w in r["widths"].values()]
-    wmax = max(all_w) if all_w else 1.0
-    grid = "grid-template-columns:1.6fr repeat(5,1fr) 80px"
-
-    head = (f'<div class="trow head" style="{grid}"><span>데이터셋</span>'
-            + "".join(f'<span class="r">Utility {r}</span>' # · ε{db.RISK_TO_EPSILON[r]:.0f}</span>'
-                      for r in RISKS)
-            + '<span class="r">축소</span></div>')
-
-    body = []
-    for r in rows:
-        w = r["widths"]
-        cells = "".join(_cell(w.get(k), wmax) for k in RISKS)
-        first, last = w.get(1), w.get(5)
-        delta = f"{first / last:.1f}×" if first and last else "-"
-        body.append(
-            f'<div class="trow" style="{grid}">'
-            f'<span><span class="tt">{r["title"]}</span>'
-            f'<span class="ts">{r["name"]} · {r["measure"]["label"]}</span></span>'
-            + cells +
-            f'<span class="r m" style="color:var(--suc2);font-weight:600">{delta}</span></div>'
-        )
+def _matrix(name: str, spec: dict, tr) -> None:
+    widths = {r: tr.final(r)[3] for r in RISKS}
+    wmax = max(widths.values()) or 1.0
+    sel = st.session_state.get(SEL)
+    m = spec["measure"]
 
     with st.container(border=True, key="card_matrix"):
         st.markdown(design.card_head(
-            # "Utility별 최종 95% CI 폭",
             "프라이버시 리스크 분석",
-            #"각 셀 = 시뮬레이션 마지막 라운드의 신뢰구간 폭 (작을수록 정밀) · "
-            "신뢰구간 상대폭 기반 유틸리티 정책 별 위험도 분석"),
-            #"축소 = Utility 1 대비 Utility 5 의 폭 축소 배율"),
-            unsafe_allow_html=True)
-        st.markdown(head + "".join(body), unsafe_allow_html=True)
+            f"통계 대상({m['label']}) 평균값을 Utility별 허용 횟수만큼 반복 질의했을 때의 "
+            "최종 95% 신뢰구간 폭"), unsafe_allow_html=True)
+
+        head = st.columns(COLS, gap="small", vertical_alignment="center")
+        head[0].markdown('<div class="pa-h">데이터셋</div>', unsafe_allow_html=True)
+        for i, r in enumerate(RISKS, 1):
+            with head[i]:
+                st.button(f"Utility {r}",
+                          key=f"pa_uton_{r}" if sel == r else f"pa_ut_{r}",
+                          on_click=_pick, args=(r,), width="stretch")
+        head[6].markdown('<div class="pa-h r">축소</div>', unsafe_allow_html=True)
+
+        row = st.columns(COLS, gap="small", vertical_alignment="center")
+        row[0].markdown(
+            f'<div class="pa-ds"><span class="tt">{_esc(spec["title"])}</span>'
+            f'<span class="ts">{name} · {_esc(m["label"])}</span></div>', unsafe_allow_html=True)
+        for i, r in enumerate(RISKS, 1):
+            row[i].markdown(_cell(widths[r], wmax, tr.k_of(r), sel == r), unsafe_allow_html=True)
+        ratio = f"{widths[1] / widths[5]:.1f}×" if widths[5] else "-"
+        row[6].markdown(f'<div class="pa-ratio">{ratio}</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="pa-div"></div>', unsafe_allow_html=True)
+        _sim(spec, tr, sel)
 
 
-def _cell(v: float | None, wmax: float) -> str:
-    if v is None:
-        return '<span class="r t">—</span>'
+def _cell(v: float, wmax: float, k: int, on: bool) -> str:
     pct = max(6.0, min(100.0, v / wmax * 100))
-    return (f'<span class="r"><span class="m">{v:,.1f}</span>'
-            f'<div class="cellbar"><span style="width:{pct:.0f}%"></span></div></span>')
+    return (f'<div class="pa-cell{" on" if on else ""}">'
+            f'<span class="v">{dp_sim.fmt_sig(v)}</span>'
+            f'<div class="bar"><span style="width:{pct:.0f}%"></span></div>'
+            f'<span class="k">질의 {k}회</span></div>')
 
 
-# ── 정책 확정 ───────────────────────────────────────────
-def _confirm(row: dict) -> None:
+def _sim(spec: dict, tr, sel: int | None) -> None:
+    if sel is None:
+        st.markdown('<div class="pa-empty">시뮬레이션을 위해서, 유틸리티 버튼을 눌러주세요</div>',
+                    unsafe_allow_html=True)
+        return
+
+    k = tr.k_of(sel)
+    eps = dp_sim.RISK_LEVELS[sel]
+    m = spec["measure"]
+    ylabel = m["label"] + (f" ({m['unit']})" if m.get("unit") else "")
+
+    top = st.columns([1, 0.2], vertical_alignment="center")
+    top[0].markdown(
+        f'<div class="pa-simhead"><b>Utility {sel}</b>'
+        f'<span>총 ε {eps:g} · 질의당 ε {dp_sim.EPS_PER_QUERY:g} · 평균 질의 {k}회 반복</span></div>',
+        unsafe_allow_html=True)
+    with top[1]:
+        st.button("↻ 다시 재생", key="pa_replay", on_click=_replay, width="stretch")
+
+    if dp_viz.KO_FONT is None:
+        st.caption("한글 글꼴을 찾지 못해 그래프 글자가 깨질 수 있습니다 (맑은 고딕 · 나눔고딕 설치 필요).")
+
+    slot = st.empty()
+    if st.session_state.get(PLAY):
+        st.session_state[PLAY] = False            # 한 번만 재생 — 이후 rerun 은 마지막 장면
+        dp_viz.play(tr, sel, ylabel, slot)
+    else:
+        dp_viz.still(tr, sel, ylabel, slot)
+
+    mean, lo, hi, w = tr.final(sel)
+    f = dp_sim.fmt_sig
+    st.markdown(
+        '<div class="pa-res">'
+        f'<span>추정된 평균값<b>{f(mean, 5)}</b></span>'
+        f'<span>95% 신뢰구간<b>[{f(lo, 5)}, {f(hi, 5)}]</b></span>'
+        f'<span class="w">신뢰구간 폭<b>{f(w)}</b></span>'
+        f'<span>실제 평균값<b>{f(tr.true_mean, 5)}</b></span>'
+        '</div>', unsafe_allow_html=True)
+
+
+# ── 2) 데이터셋 기본 정책 설정 ────────────────────────────
+
+def _confirm(name: str, spec: dict) -> None:
     admin = st.session_state.get("username") or "admin"
-    ds = row["name"]
 
     with st.container(border=True, key="card_confirm"):
         st.markdown(design.card_head(
             "데이터셋 기본 정책 설정",
-            f"대상: {row['title']}"), # · {ds} — 확정된 정책은 개인 오버라이드가 없는 모든 분석가에게 적용됩니다."),
+            f"대상: {spec['title']} · 위 표에서 Utility 를 누르면 선택칸도 함께 바뀝니다"),
             unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns([1.1, 2.2, 0.8], vertical_alignment="bottom")
         with c1:
-            lv = st.selectbox("Utility", RISKS, index=2, key="pol_lv",
-                              format_func=lambda x: f"Utility {x} ({db.RISK_TO_EPSILON[x]:.0f} ε)")
+            st.selectbox("Utility", RISKS, key="pol_lv",
+                         format_func=lambda x: f"Utility {x} ({db.RISK_TO_EPSILON[x]:.0f} ε)")
         with c2:
-            note = st.text_input("메모", key="pol_note", placeholder="확정 근거 (선택)")
+            st.text_input("메모", key="pol_note", placeholder="확정 근거 (선택)")
         with c3:
-            if st.button("확정", type="primary", key="pol_ok", use_container_width=True):
-                try:
-                    db.confirm_policy(admin, ds, int(lv), note or None)
-                    st.success(f"{ds} 기본 정책을 Utility {lv} 로 확정했습니다.")
-                except Exception as e:
-                    st.error(f"확정하지 못했습니다 ({type(e).__name__}: {e})")
+            st.button("확정", type="primary", key="pol_ok", width="stretch",
+                      on_click=_do_confirm, args=(admin, name))
 
-        # 이 데이터셋의 확정 이력만 (최근 8건)
-        hist = [h for h in db.policy_history(limit=50) if h.get("db_name") == ds][:8]
         st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
-        if not hist:
-            st.markdown(design.empty("이 데이터셋의 확정 이력이 없습니다"), unsafe_allow_html=True)
-            return
-        grid = "grid-template-columns:100px 120px 1fr"
-        out = [f'<div class="trow head" style="{grid}"><span>확정</span>'
-               '<span>Utility</span><span>메모</span></div>']
-        for h in hist:
-            risk_badge = design.pill("Utility " + str(h["risk_level"]), "primary")
-            out.append(
-                f'<div class="trow" style="{grid}">'
-                f'<span class="t">{_t(h.get("confirmed_at"))}</span>'
-                f'<span>{risk_badge}</span>'
-                f'<span class="x">{_esc(h.get("note") or "-")}</span></div>'
-            )
-        st.markdown("".join(out), unsafe_allow_html=True)
+        _policies(name)
+
+
+def _policies(cur: str) -> None:
+    """데이터셋별 현재 적용 정책 — 수동(관리자 확정) / 자동(확정 없음 → 시스템 기본값)."""
+    active = db.list_active_policies()
+    names = [n for n, s in fields.SPECS.items() if s.get("enabled")]
+    eps_q = dp_sim.EPS_PER_QUERY if dp_sim else EPS_Q
+    grid = "grid-template-columns:1.7fr 0.8fr 0.6fr 0.7fr 0.7fr 1fr 0.8fr"
+
+    out = [f'<div class="trow head" style="{grid}"><span>데이터셋</span><span>Utility</span>'
+           '<span class="r">총 ε</span><span class="r">질의 횟수</span><span>적용 방식</span>'
+           '<span>확정 시각</span><span>확정자</span></div>']
+    for n in names:
+        p = active.get(n)
+        manual = p is not None
+        lv = int(p["risk_level"]) if manual else int(db.DEFAULT_POLICY["risk_level"])
+        eps = db.RISK_TO_EPSILON[lv]
+        mode = ('<span class="pmode m">수동</span>' if manual
+                else '<span class="pmode a">자동</span>')
+        out.append(
+            f'<div class="trow{" on" if n == cur else ""}" style="{grid}">'
+            f'<span><span class="tt">{_esc(fields.SPECS[n].get("title", n))}</span>'
+            f'<span class="ts">{n}</span></span>'
+            f'<span>{design.pill(f"Utility {lv}", "primary")}</span>'
+            f'<span class="r m">{eps:g}</span>'
+            f'<span class="r m">{int(round(eps / eps_q))}회</span>'
+            f'<span>{mode}</span>'
+            f'<span class="t">{_t(p.get("confirmed_at")) if manual else "-"}</span>'
+            f'<span class="t">{_esc(p.get("admin") or "-") if manual else "-"}</span></div>')
+    st.markdown("".join(out), unsafe_allow_html=True)
 
 
 def _t(v) -> str:

@@ -294,3 +294,86 @@ def simulate(db_name: str, risk_level: int) -> SimResult:
         overlap_hi=ov_hi,
         overlap_ratio=ratio,
     )
+
+    # ══ [1027] 프라이버시 분석 화면용 — 데이터셋당 1회 시뮬레이션 ═════════════
+# 노이즈 응답을 K_MAX(=100)개 한 번만 만들고, Utility 별로 앞 k 개를 쓴다.
+# 누적 평균·CI 는 앞에서부터 쌓이므로 i 번째 값 = '처음 i+1 번 질의했을 때의 결과'.
+# → 같은 seed 의 같은 질의를 더 반복했을 때 좁아지는 모습이 구조적으로 보장된다.
+
+import math
+
+K_MAX: int = int(round(max(RISK_LEVELS.values()) / EPS_PER_QUERY))   # 100
+
+# 데이터셋별 값 필터 (원본에서 이미 제거했다면 영향 없음 — 안전장치)
+FILTERS = {
+    "024_Salary": lambda x: x > 0,
+}
+
+
+def _sync_targets() -> None:
+    """fields.SPECS 의 measure 컬럼을 시뮬레이션 대상으로 등록한다 (데모 데이터셋 최신화)."""
+    from ui import fields          # 순환 import 방지용 지연 import
+    for name, spec in fields.SPECS.items():
+        if spec.get("enabled"):
+            SIM_TARGET[name] = spec["measure"]["col"]
+
+
+_sync_targets()
+
+
+@dataclass
+class Trace:
+    db_name:     str
+    target_col:  str
+    n_rows:      int
+    true_mean:   float
+    sensitivity: float
+    noisy:       np.ndarray      # 길이 K_MAX
+    cum_means:   np.ndarray
+    ci_los:      np.ndarray
+    ci_his:      np.ndarray
+
+    def k_of(self, level: int) -> int:
+        """Utility 레벨의 허용 질의 횟수 k = 총 ε / 질의당 ε."""
+        return int(round(RISK_LEVELS[level] / EPS_PER_QUERY))
+
+    def final(self, level: int) -> tuple[float, float, float, float]:
+        """마지막(k번째) 질의 후 (추정 평균, CI 하한, CI 상한, CI 폭)."""
+        i = self.k_of(level) - 1
+        lo, hi = float(self.ci_los[i]), float(self.ci_his[i])
+        return float(self.cum_means[i]), lo, hi, hi - lo
+
+
+@st.cache_data(show_spinner="시뮬레이션 준비 중…")
+def trace(db_name: str) -> Trace:
+    """통계 대상 컬럼의 '조건 없는 평균' 질의를 K_MAX 번 반복한 시뮬레이션."""
+    if not is_supported(db_name):
+        raise ValueError(f"'{db_name}' 는 시뮬레이션 대상 컬럼이 등록되어 있지 않습니다.")
+
+    df  = catalog.load_df(db_name)
+    col = _resolve_target_col(df, SIM_TARGET[db_name], db_name)
+    x   = pd.to_numeric(df[col], errors="coerce").to_numpy(dtype=float)
+    x   = x[np.isfinite(x)]
+    f   = FILTERS.get(db_name)
+    if f is not None:
+        x = x[f(x)]
+    if x.size < 2:
+        raise ValueError(f"'{db_name}'.'{col}' 에 유효한 값이 2개 미만입니다.")
+
+    n     = int(x.size)
+    mu    = float(x.mean())
+    delta = float((x.max() - x.min()) / n)          # 평균 질의의 민감도
+
+    noisy = _laplace_stream(mu, delta, EPS_PER_QUERY, K_MAX, SEED)
+    cm, lo, hi = _running_ci(noisy, alpha=ALPHA)
+    return Trace(db_name, col, n, mu, delta, noisy, cm, lo, hi)
+
+
+def fmt_sig(v, sig: int = 3) -> str:
+    """유효숫자 기준 표시 — 0.187 → '0.187', 0.0837 → '0.0837', 265.8 → '266'."""
+    if v is None or not np.isfinite(v):
+        return "-"
+    if v == 0:
+        return "0"
+    d = max(0, sig - 1 - int(math.floor(math.log10(abs(v)))))
+    return f"{v:,.{d}f}"

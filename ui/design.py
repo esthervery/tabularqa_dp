@@ -757,6 +757,65 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
 .cellbar span{display:block;height:100%;border-radius:9px;
   background:linear-gradient(90deg,#c7d2fe,#6366f1)}
 
+  /* ══ 11-x. 프라이버시 분석 — Utility 버튼 · 시뮬레이션 · 적용 정책 표 ══ */
+.pa-h{ font-size:11.5px; font-weight:600; color:var(--mid); }
+.pa-h.r{ text-align:right; }
+.pa-ds .tt{ display:block; font-size:13.5px; font-weight:600; color:var(--ink); }
+.pa-ds .ts{ display:block; font-size:11.5px; color:var(--dim); font-family:var(--mono); }
+.pa-cell{ text-align:right; }
+.pa-cell .v{ font-family:var(--mono); font-size:13px; font-weight:500; color:var(--ink2); }
+.pa-cell .bar{ height:6px; border-radius:99px; background:var(--bd2); margin:6px 0 4px; overflow:hidden; }
+.pa-cell .bar span{ display:block; height:100%; border-radius:99px; background:var(--priline); }
+.pa-cell.on .bar span{ background:var(--pri); }
+.pa-cell.on .v{ color:var(--pri2); font-weight:700; }
+.pa-cell .k{ font-size:10.5px; color:var(--dim); }
+.pa-ratio{ text-align:right; font-family:var(--mono); font-size:13px; font-weight:600; color:var(--suc2); }
+
+/* Utility 버튼 (열 제목) — 기본 연회색 · hover 보라 테두리 · 선택 보라 바탕 */
+.stApp [class*="st-key-pa_ut_"] button,
+.stApp [class*="st-key-pa_uton_"] button{
+  height:34px !important; min-height:34px !important; border-radius:9px !important;
+  border:1px solid var(--bd) !important; background:var(--wash) !important;
+  color:var(--ink2) !important; box-shadow:none !important; transition:all .15s ease;
+}
+.stApp [class*="st-key-pa_ut_"] button p,
+.stApp [class*="st-key-pa_uton_"] button p{
+  color:inherit !important; font-size:12.5px !important; font-weight:700 !important; letter-spacing:.02em;
+}
+.stApp [class*="st-key-pa_ut_"] button:hover{
+  background:#fff !important; border-color:var(--pri) !important; color:var(--pri2) !important;
+}
+.stApp [class*="st-key-pa_uton_"] button{
+  background:var(--pri) !important; border-color:var(--pri) !important; color:#fff !important;
+  box-shadow:0 2px 6px rgba(99,102,241,.28) !important;
+}
+
+/* 시뮬레이션 영역 */
+.pa-div{ height:1px; background:var(--bd2); margin:6px 0 10px; }
+.pa-empty{ height:120px; display:flex; align-items:center; justify-content:center;
+  border:1.5px dashed var(--bd); border-radius:12px; background:var(--wash);
+  font-size:13px; color:var(--mid); }
+.pa-simhead{ display:flex; align-items:baseline; gap:10px; }
+.pa-simhead b{ font-size:14px; color:var(--pri2); }
+.pa-simhead span{ font-size:12px; color:var(--mid); }
+.pa-res{ display:flex; flex-wrap:wrap; gap:6px 22px; padding:10px 14px; border-radius:10px;
+  background:var(--wash); font-size:12.5px; color:var(--mid); }
+.pa-res b{ margin-left:6px; font-family:var(--mono); font-weight:600; color:var(--ink); }
+.pa-res .w b{ color:var(--pri2); }
+
+/* 다시 재생 — 텍스트 링크 */
+.stApp .st-key-pa_replay button{
+  border:none !important; background:transparent !important; box-shadow:none !important;
+  height:auto !important; min-height:0 !important; padding:2px 0 !important; justify-content:flex-end !important;
+}
+.stApp .st-key-pa_replay button p{ color:var(--pri) !important; font-size:12.5px !important; font-weight:600 !important; }
+.stApp .st-key-pa_replay button:hover p{ color:var(--pri2) !important; text-decoration:underline; }
+
+/* 적용 정책 표 */
+.trow.on{ background:var(--prisoft); }
+.pmode{ display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; }
+.pmode.m{ background:var(--prisoft); color:var(--pri2); border:1px solid var(--priline); }
+.pmode.a{ background:var(--bd2); color:var(--mid); border:1px solid var(--bd); }
 
 /* ════════════════════════════════════════════════════════════════
    12. 호환용 — 현재 화면에서 호출하지 않는 함수의 스타일
