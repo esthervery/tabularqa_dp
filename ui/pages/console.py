@@ -21,7 +21,9 @@ import time
 import streamlit as st
 
 from ui import agent_bridge as ab
+
 from ui import db, design, fields, guardrail, hints, state, dp_noise
+from ui import answer_explain as ax
 
 
 # 질의당 ε. dp_sim 은 scipy 를 요구하므로, 없어도 화면이 뜨도록 기본값을 먼저 확정한다.
@@ -102,6 +104,11 @@ def _load_thread(name: str) -> list:
             "ans": ans,
             "label": "결과",
             "err": err,
+            "note": (ax.template(ax.fmt_value(ans),
+                                 unit=fields.SPECS[name]["measure"].get("unit") or "",
+                                 eps=float(r.get("eps_spent") or 0.0),
+                                 noised=float(r.get("eps_spent") or 0.0) > 0)
+                     if ok and ans else None),
             "eps": float(r.get("eps_spent") or 0.0) if ok else None,
             "meta": f"{name} · {start + i + 1}번째 질의",
             "fresh": False,                       # 복원분은 타이핑 효과 없음
@@ -237,6 +244,8 @@ def _thread(cur: str) -> None:
         else:
             st.html(design.agent_card(m.get("code"), m.get("ans", ""),
                                       label=m.get("label", "결과"), eps=m.get("eps")))
+        if m.get("note") and not m.get("err"):
+            st.html(design.agent_note(m["note"]))
 
 
 def _type_out(m: dict) -> None:
@@ -348,9 +357,12 @@ def _answer(cur: str, q: str) -> None:
             _push(q, code=code, err=f"코드 실행 실패 · {ans_s.split(':', 1)[-1].strip()[:160]}")
             db.log_query(user, cur, q, f"[error] {ans_s}", code=code, ok=False, eps_spent=0.0)
         else:
+            unit = meas.get("unit") or ""
             if st.session_state.get("is_admin"):
                 # 관리자 — 노이즈 없이 원본 정답. ε 도 차감하지 않는다(DP 응답이 아니므로).
-                _push(q, code=code, ans=ans_s, label=f'{meas["label"]} · 원본', eps=0.0)
+                note = ax.explain(q, ans_s, qcode=qcode, measure=meas["label"],
+                                  unit=unit, eps=0.0, noised=False)
+                _push(q, code=code, ans=ans_s, label=f'{meas["label"]} · 원본', eps=0.0, note=note)
                 db.log_query(user, cur, q, ans_s, code=code, ok=True, eps_spent=0.0)
             else:
                 try:
@@ -360,8 +372,12 @@ def _answer(cur: str, q: str) -> None:
                     db.log_query(user, cur, q, f"[error] noise: {e}", code=code, ok=False, eps_spent=0.0)
                 else:
                     noisy = str(dp["value"])
-                    _push(q, code=code, ans=noisy, label=meas["label"])
+                    # LLM 에는 노이즈를 붙인 값만 넘긴다
+                    note = ax.explain(q, dp["value"], qcode=qcode, measure=meas["label"],
+                                      unit=unit, eps=eps, noised=True)
+                    _push(q, code=code, ans=noisy, label=meas["label"], note=note)
                     state.record_query(q, noisy, code=code, ok=True, db_name=cur)
+
 
     except ab.PipelineUnavailable as e:
         msg = f"에이전트 파이프라인을 사용할 수 없습니다 — {e.reason}"
@@ -386,11 +402,11 @@ def _block(user: str, cur: str, q: str, msg: str) -> None:
 
 def _push(q: str, *, code: str | None = None, ans: str = "",
           label: str = "결과", err: str | None = None,
-          eps: float | None = None) -> None:
+          eps: float | None = None, note: str | None = None) -> None:
     db = st.session_state.get("db_name")
     msgs = _msgs(db)
     msgs.append({
-        "q": q, "code": code, "ans": ans, "label": label, "err": err,
+        "q": q, "code": code, "ans": ans, "label": label, "err": err, "note": note,
         "eps": (float(st.session_state.get("eps") or EPS) if eps is None else eps) if not err else None,
         "meta": f"{db} · {len(msgs) + 1}번째 질의",
         "fresh": err is None,          # 다음 렌더에서 한 번만 타이핑 효과

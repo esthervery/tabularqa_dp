@@ -1197,6 +1197,15 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 .stApp .st-key-nav_user_ad button p::before{ content:"AD"; }
 .stApp .st-key-nav_user_ad button p::after { content:"Admin"; }
 
+/* 응답 해설 말풍선 */
+.stApp .anote{ display:flex; margin:-6px 0 14px 48px; }
+.stApp .anote-b{
+  max-width:min(680px, 100%);
+  padding:10px 14px; border-radius:4px 14px 14px 14px;
+  background:var(--prisoft); border:1px solid var(--priline);
+  color:var(--ink, #1f2330); font-size:13px; line-height:1.6;
+}
+
 </style>
 """
 
@@ -1628,3 +1637,9 @@ def pager(total: int, size: int, key: str, reset_on=None) -> tuple[int, int]:
                 st.caption("페이지 버튼은 최신 Streamlit 에서 표시됩니다 — pip install -U streamlit")
     start = (page - 1) * size
     return start, min(start + size, total)
+
+
+def agent_note(text: str) -> str:
+    """에이전트 응답 카드 아래 자연어 해설 말풍선."""
+    import html as _h
+    return f'<div class="anote"><div class="anote-b">{_h.escape(text)}</div></div>'
