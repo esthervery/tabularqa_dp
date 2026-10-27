@@ -52,6 +52,7 @@ import hashlib
 import hmac
 import secrets
 import sqlite3
+import re
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -188,8 +189,42 @@ def init() -> None:
                        "eps_cap REAL NOT NULL DEFAULT 10.0")
 
 
-# ── 비밀번호 파생 ────────────────────────────────
+# ── 계정 규칙 ────────────────────────────────────
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,20}$")
+PW_MIN, PW_MAX = 10, 128
+_WEAK = ("password", "qwerty", "1234", "admin", "dpilot", "letmein")
 
+
+def validate_username(username: str) -> tuple[bool, str]:
+    if not USERNAME_RE.fullmatch(username or ""):
+        return False, "아이디는 영문·숫자·밑줄(_) 3~20자로 입력하세요."
+    return True, ""
+
+
+def validate_password(password: str, username: str = "") -> tuple[bool, str]:
+    """비밀번호 규칙. 통과하면 (True, '')."""
+    pw = password or ""
+    if len(pw) < PW_MIN:
+        return False, f"비밀번호는 {PW_MIN}자 이상이어야 합니다."
+    if len(pw) > PW_MAX:
+        return False, f"비밀번호는 {PW_MAX}자 이하여야 합니다."
+    if not pw.isascii() or any(c.isspace() for c in pw):
+        return False, "비밀번호는 공백 없이 영문·숫자·특수문자로만 입력하세요."
+    kinds = sum([any(c.islower() for c in pw), any(c.isupper() for c in pw),
+                 any(c.isdigit() for c in pw), any(not c.isalnum() for c in pw)])
+    if kinds < 3:
+        return False, "영문 대문자·소문자·숫자·특수문자 중 3종류 이상을 섞어 주세요."
+    low = pw.lower()
+    if username and username.lower() in low:
+        return False, "비밀번호에 아이디를 포함할 수 없습니다."
+    if any(w in low for w in _WEAK):
+        return False, "추측하기 쉬운 단어(password, 1234, admin 등)는 쓸 수 없습니다."
+    if re.search(r"(.)\1{3,}", pw):
+        return False, "같은 문자를 4번 이상 연속으로 쓸 수 없습니다."
+    return True, ""
+
+
+# ── 비밀번호 파생 ────────────────────────────────
 def _derive(password: str, salt_hex: str) -> str:
     return hashlib.pbkdf2_hmac(
         "sha256", password.encode("utf-8"),
@@ -198,7 +233,6 @@ def _derive(password: str, salt_hex: str) -> str:
 
 
 # ── users ────────────────────────────────────────
-
 def user_exists(username: str) -> bool:
     with connect() as con:
         return con.execute(
@@ -213,8 +247,12 @@ def create_user(username: str, password: str,
     username = username.strip()
     if not username or not password:
         return False, "아이디와 비밀번호를 입력하세요."
-    if len(password) < 8:
-        return False, "비밀번호는 8자 이상이어야 합니다."
+    ok, why = validate_username(username)
+    if not ok:
+        return False, why
+    ok, why = validate_password(password, username)
+    if not ok:
+        return False, why
     if eps_cap is None:
         eps_cap = DEFAULT_POLICY["total_epsilon"]
 
