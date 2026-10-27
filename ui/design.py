@@ -45,7 +45,7 @@ _CSS = """
       2. 공통 · Streamlit 위젯 (버튼 · 입력 · 라디오 · 탭 · 알림 · 카드 컨테이너)
       3. 공통 · 컴포넌트 (제목 · 뱃지 · 안내 블록 · 보조 줄 · 표 · 유틸)
       4. [app.py]                상단 네비게이션
-      5. [auth.py]               로그인
+      5. [pages/auth.py]         로그인
       6. [console.py]            질의 콘솔
       7. [console · history]     에이전트 응답 카드 (공용)
       8. [history.py]            채팅 히스토리
@@ -370,7 +370,7 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
 
 
 /* ════════════════════════════════════════════════════════════════
-   5. [auth.py] 로그인
+   5. [pages/auth.py] 로그인
    ════════════════════════════════════════════════════════════════ */
 
 /* ── 로그인 폼 카드 (key=login_card) ── */
@@ -1073,7 +1073,7 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 .stApp .pa-cell, .stApp .pa-cell .bar, .stApp .pa-cell .bar span{ opacity:1 !important; }
 .stApp .pa-cell .bar span{ background:var(--pri) !important; }
 
-/* 시뮬레이션 수치 패널 (dp_viz.stats_html) */
+/* 시뮬레이션 수치 패널 (dputils/dp_viz.stats_html) */
 .dpstat{ display:flex; flex-direction:column; gap:9px; padding:4px 0 4px 18px;
   border-left:1px solid var(--bd); }
 .dpstat .r{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }

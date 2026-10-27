@@ -23,7 +23,10 @@
 from pathlib import Path
 
 import streamlit as st
-from ui import auth, boot, db, design, fields, state
+from ui import db, design, fields
+from ui.dputils import state
+from ui.pages import auth
+from ui.utils import boot
 
 db.init()
 authed = st.session_state.get("authenticated", False)

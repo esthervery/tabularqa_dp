@@ -20,17 +20,19 @@ import time
 
 import streamlit as st
 
-from ui import agent_bridge as ab
+from ui.utils import agent_bridge as ab
 
-from ui import db, design, fields, guardrail, hints, state, dp_noise, rate_limit
-from ui import answer_explain as ax
+from ui import db, design, fields, guardrail, hints
+from ui.dputils import answer_explain as ax
+from ui.dputils import dp_noise, state
+from ui.security import rate_limit
 
 
 # 질의당 ε. dp_sim 은 scipy 를 요구하므로, 없어도 화면이 뜨도록 기본값을 먼저 확정한다.
 EPS = 0.1
 try:
     # dp_sim 은 scipy 가 필요하다 — 없어도 콘솔은 떠야 한다
-    from ui import dp_sim
+    from ui.dputils import dp_sim
     EPS = float(dp_sim.EPS_PER_QUERY)
 except Exception:         # noqa: BLE001
     dp_sim = None

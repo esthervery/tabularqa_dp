@@ -17,7 +17,9 @@ import html
 
 import streamlit as st
 
-from ui import db, design, requests, authz
+from ui import db, design
+from ui.dputils import requests
+from ui.security import authz
 
 E = db.RISK_TO_EPSILON
 PAGE_SIZE = 10                                    # 한 페이지 행 수 (두 줄 행이라 히스토리보다 적게)

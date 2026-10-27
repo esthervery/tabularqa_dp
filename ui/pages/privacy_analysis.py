@@ -9,23 +9,24 @@ Renders (위→아래):
        · Utility · 메모 · [확정]
        · 데이터셋별 적용 정책 표 (수동 = 관리자 확정 / 자동 = 확정 없음 → 시스템 기본값)
 
-계산: ui/dp_sim.trace() — 데이터셋당 노이즈 응답 100개를 한 번 만들고 Utility 별로 앞 k 개를 쓴다.
+계산: ui/dputils/dp_sim.trace() — 데이터셋당 노이즈 응답 100개를 한 번 만들고 Utility 별로 앞 k 개를 쓴다.
 관리자 전용 화면이므로 참 평균 · 실제 값 축을 그대로 보여준다.
 """
 from __future__ import annotations
 
 import streamlit as st
 
-from ui import db, design, fields, authz
+from ui import db, design, fields
+from ui.security import authz
 
 try:
-    from ui import dp_sim, dp_viz
+    from ui.dputils import dp_sim, dp_viz
     _SIM_ERR = None
 except Exception as _e:   # scipy · matplotlib 미설치 등 — 화면은 뜨고 안내만 남긴다
     dp_sim = dp_viz = None
     _SIM_ERR = f"{type(_e).__name__}: {_e}"
 try:
-    from ui import sim_explain
+    from ui.dputils import sim_explain
 except Exception:           # 해설이 없어도 시뮬레이션은 동작
     sim_explain = None
 

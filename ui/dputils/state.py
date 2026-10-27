@@ -119,7 +119,7 @@ def apply_effective_policy(db_name: str | None = None) -> dict:
     Agent Console 진입/새로고침 시 호출된다.
     """
     from ui import db as _db
-    from ui import dp_sim
+    from ui.dputils import dp_sim
 
     db_name = db_name or st.session_state.get("db_name", "")
     user = st.session_state.get("username")

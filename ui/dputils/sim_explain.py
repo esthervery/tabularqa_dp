@@ -14,7 +14,7 @@ import json
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 
-from ui import dp_sim
+from ui.dputils import dp_sim
 
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TIMEOUT = 20.0

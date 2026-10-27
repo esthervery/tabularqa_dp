@@ -27,7 +27,8 @@ import time
 
 import pandas as pd
 import streamlit as st
-from ui import boot, catalog
+from ui import catalog
+from ui.utils import boot
 
 
 class PipelineUnavailable(RuntimeError):

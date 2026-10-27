@@ -44,7 +44,7 @@ def _warm() -> None:
         # agent_bridge 는 모듈 레벨에서 install_local_loader() 를 실행하므로,
         # 여기서 import 하는 것만으로 HF 다운로드 차단이 먼저 걸린다.
         # (모듈 최상위에서 import 하면 agent_bridge ↔ boot 순환이 되므로 함수 안에서.)
-        from ui import agent_bridge as ab
+        from ui.utils import agent_bridge as ab
         pipe, err = ab.get_pipe(MODEL)
         _pipe, _error = pipe, err
     except Exception as e:  # import 실패까지 포함
@@ -88,7 +88,7 @@ def discard() -> None:
     global _started, _pipe, _error, _elapsed
     with _lock:
         try:
-            from ui import agent_bridge as ab
+            from ui.utils import agent_bridge as ab
             ab.get_pipe.clear()
         except Exception:
             # agent_bridge 를 못 불러온 상황(의존성 결손 등)이면 캐시도 없다.

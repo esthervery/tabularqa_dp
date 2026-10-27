@@ -9,7 +9,9 @@ Renders (위→아래):
   - 하단      : 저작권/빌드 표시
 """
 import streamlit as st
-from ui import db, design, login_guard, state
+from ui import db, design
+from ui.dputils import state
+from ui.security import login_guard
 import math
 
 

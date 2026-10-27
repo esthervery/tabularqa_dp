@@ -202,7 +202,7 @@ def _resolve_target_col(df: pd.DataFrame, target_col: str, db_name: str) -> str:
         raise ValueError(
             f"'{db_name}' 에 '{target_col}' 와 (대소문자·밑줄만 다른) 같은 이름의 "
             f"컬럼이 여러 개 있습니다: {matches}. "
-            f"ui/dp_sim.py 의 SIM_TARGET 에 정확한 이름을 지정하세요."
+            f"ui/dputils/dp_sim.py 의 SIM_TARGET 에 정확한 이름을 지정하세요."
         )
 
     near = [c for c in df.columns if key in _normalize_col(c) or _normalize_col(c) in key]
@@ -223,7 +223,7 @@ def simulate(db_name: str, risk_level: int) -> SimResult:
     if not is_supported(db_name):
         raise ValueError(
             f"'{db_name}' 는 시뮬레이션 대상 컬럼이 등록되어 있지 않습니다. "
-            f"ui/dp_sim.py 의 SIM_TARGET 에 추가하세요."
+            f"ui/dputils/dp_sim.py 의 SIM_TARGET 에 추가하세요."
         )
     if risk_level not in RISK_LEVELS:
         raise ValueError(f"risk_level 은 1..5 만 지원합니다: {risk_level}")

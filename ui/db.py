@@ -60,7 +60,7 @@ from pathlib import Path
 DB_PATH = Path(__file__).resolve().parent.parent / "dp_demo.db"
 ITERATIONS = 200_000    # pbkdf2 반복 횟수 (데모라 짧게)
 
-# 리스크 레벨 → 총 ε (dp_sim.RISK_LEVELS 와 동일 값 유지)
+# 리스크 레벨 → 총 ε (dputils/dp_sim.RISK_LEVELS 와 동일 값 유지)
 RISK_TO_EPSILON: dict[int, float] = {1: 2.0, 2: 4.0, 3: 6.0, 4: 8.0, 5: 10.0}
 
 

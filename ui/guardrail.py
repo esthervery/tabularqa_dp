@@ -60,7 +60,7 @@ def _trace(v, *, cached: bool = False) -> None:
 
 
 # ── 질의코드 — 허용 질의의 유일한 목록 ─────────────────────────
-# 노이즈 Δ 계산(ui/dp_noise.py 의 TERMS)과 같은 목록이어야 한다. 하나를 고치면 둘 다 고친다.
+# 노이즈 Δ 계산(ui/dputils/dp_noise.py 의 TERMS)과 같은 목록이어야 한다. 하나를 고치면 둘 다 고친다.
 QUERY_CODES: dict[str, str] = {
     "MEAN":        "평균 하나",
     "MEDIAN":      "중앙값 하나",

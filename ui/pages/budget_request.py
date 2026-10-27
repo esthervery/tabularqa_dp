@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui import db, design, fields, requests, state
+from ui import db, design, fields
+from ui.dputils import requests, state
 
 EPS = 0.1
 try:
-    from ui import dp_sim
+    from ui.dputils import dp_sim
     EPS = float(dp_sim.EPS_PER_QUERY)
 except Exception:         # noqa: BLE001
     dp_sim = None

@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 from matplotlib import font_manager as fm
 import numpy as np
 
-from ui import dp_sim
+from ui.dputils import dp_sim
 
 
 # ── 조절값 ──────────────────────────────────────
