@@ -412,7 +412,20 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--pri) !important;
    ════════════════════════════════════════════════════════════════ */
 
 /* ── 6-1. 밴드 바깥 · 행 높이 ── */
-.stApp .st-key-cband{ margin:-10px 0 14px !important; }
+.stApp .st-key-cband{
+  margin:-15px 0 0 !important;          /* 아래 여백 14px → 0 */
+  padding-bottom:10px !important;       /* (a) 카드 밑선 ↔ 그림자 경계 사이 간격 */
+  position:relative; z-index:2;         /* 그림자가 대화 카드에 가려지지 않게 위로 올림 */
+  background:#fff;
+  box-shadow:0 8px 12px -10px rgba(15,23,42,.18);   /* (b) 아래쪽에만 생기는 옅은 그림자 */
+}
+
+/* 대화 스크롤 영역 (key=convo) — 기본 간격 상쇄 + 첫 말풍선 여유 */
+.stApp .st-key-convo{
+  margin-top:-1rem !important;          /* 기본 간격(1rem)을 정확히 상쇄 → 잘리는 선 = 그림자 경계 */
+  padding-top:12px !important;          /* 그림자 경계 ↔ 첫 말풍선 간격 */
+}
+
 .stApp .st-key-cband [data-testid="stHorizontalBlock"]{ align-items:stretch !important; }
 
 /* 넘침·스크롤 방지 */

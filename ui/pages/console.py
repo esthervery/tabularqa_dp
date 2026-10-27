@@ -149,7 +149,8 @@ def render() -> None:
     cur = st.session_state.db_name
 
     _band(cur)
-    _thread(cur)
+    with st.container(height=500, border=False, autoscroll=True, key="convo"):
+        _thread(cur)
     _composer(cur)
 
 
@@ -347,15 +348,20 @@ def _answer(cur: str, q: str) -> None:
             _push(q, code=code, err=f"코드 실행 실패 · {ans_s.split(':', 1)[-1].strip()[:160]}")
             db.log_query(user, cur, q, f"[error] {ans_s}", code=code, ok=False, eps_spent=0.0)
         else:
-            try:
-                dp = dp_noise.privatize(ans, qcode, cur, eps)
-            except dp_noise.NoiseError as e:      # 노이즈를 못 붙이면 응답을 내보내지 않는다
-                _push(q, code=code, err=f"DP 노이즈를 적용하지 못해 응답을 보류했습니다 — {e}")
-                db.log_query(user, cur, q, f"[error] noise: {e}", code=code, ok=False, eps_spent=0.0)
+            if st.session_state.get("is_admin"):
+                # 관리자 — 노이즈 없이 원본 정답. ε 도 차감하지 않는다(DP 응답이 아니므로).
+                _push(q, code=code, ans=ans_s, label=f'{meas["label"]} · 원본', eps=0.0)
+                db.log_query(user, cur, q, ans_s, code=code, ok=True, eps_spent=0.0)
             else:
-                noisy = str(dp["value"])
-                _push(q, code=code, ans=noisy, label=meas["label"])
-                state.record_query(q, noisy, code=code, ok=True, db_name=cur)
+                try:
+                    dp = dp_noise.privatize(ans, qcode, cur, eps)
+                except dp_noise.NoiseError as e:      # 노이즈를 못 붙이면 응답을 내보내지 않는다
+                    _push(q, code=code, err=f"DP 노이즈를 적용하지 못해 응답을 보류했습니다 — {e}")
+                    db.log_query(user, cur, q, f"[error] noise: {e}", code=code, ok=False, eps_spent=0.0)
+                else:
+                    noisy = str(dp["value"])
+                    _push(q, code=code, ans=noisy, label=meas["label"])
+                    state.record_query(q, noisy, code=code, ok=True, db_name=cur)
 
     except ab.PipelineUnavailable as e:
         msg = f"에이전트 파이프라인을 사용할 수 없습니다 — {e.reason}"
@@ -379,12 +385,13 @@ def _block(user: str, cur: str, q: str, msg: str) -> None:
 
 
 def _push(q: str, *, code: str | None = None, ans: str = "",
-          label: str = "결과", err: str | None = None) -> None:
+          label: str = "결과", err: str | None = None,
+          eps: float | None = None) -> None:
     db = st.session_state.get("db_name")
     msgs = _msgs(db)
     msgs.append({
         "q": q, "code": code, "ans": ans, "label": label, "err": err,
-        "eps": float(st.session_state.get("eps") or EPS) if not err else None,
+        "eps": (float(st.session_state.get("eps") or EPS) if eps is None else eps) if not err else None,
         "meta": f"{db} · {len(msgs) + 1}번째 질의",
         "fresh": err is None,          # 다음 렌더에서 한 번만 타이핑 효과
     })
