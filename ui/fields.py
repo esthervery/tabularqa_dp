@@ -3,11 +3,6 @@
 설계 원칙
     1) dtype 으로 종류를 추론하지 않는다. 066 의 Education/JobLevel/JobSatisfaction 과
        047 의 attrition_flag, 073 의 children 은 모두 uint8 이지만 범주형이다.
-    2) 스펙에는 '값'을 적지 않는다. 컬럼명·표시명·종류만 갖는다.
-       값 목록을 스펙에 넣는 순간 그 파일이 유출 경로가 된다.
-    3) 힌트는 종류(kind)만 노출한다.
-       범주형 → 값 몇 종인지 / 수치형 → 사분위 3개 / 이진 결과 → 2종.
-       값 자체·최소·최대·건수·비율은 화면에 내보내지 않는다. (ε 미차감 정보이므로)
 
 사용
     from demo.fields import SPECS, ENABLED

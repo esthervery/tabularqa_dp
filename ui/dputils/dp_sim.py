@@ -1,12 +1,11 @@
-"""KCI 시뮬레이터 (Privacy Policy 페이지 전용).
+"""KCI 방식의 시뮬레이터 (Privacy Policy 페이지 전용).
 
 관리자가 리스크 레벨 버튼을 누르면 이 모듈이:
     1) 대상 DB 의 관심 컬럼(SIM_TARGET) 을 로드
     2) 민감도 Δ = (max - min) / n 계산
     3) k = total_eps / eps_per_query 라운드만큼 라플라스 노이즈 응답 생성
     4) 라운드별 누적 평균 · 95% 신뢰구간 계산 → 시각화 A 데이터
-    5) 마지막 라운드에서 원본 CI ↔ 인접 DB CI(Δ만큼 이동) 겹침 계산 → 시각화 B 데이터
-을 dataclass 로 반환한다.
+를 dataclass 로 반환한다.
 
 정지 규칙 없음 — k 라운드를 반드시 다 실행.
 캐시 없음 — st.cache_data 로만 세션 내 재계산 회피.
@@ -62,7 +61,7 @@ SIM_TARGET: dict[str, str] = {
 
 @dataclass
 class SimResult:
-    """simulate() 가 반환하는 값. 시각화 A/B 가 이 하나로 모두 그려진다."""
+    """simulate() 가 반환하는 값. 시각화 A가 그려진다."""
     # 메타
     db_name:      str
     target_col:   str
@@ -166,6 +165,8 @@ def _overlap(a_lo: float, a_hi: float,
 
     overlap_ratio = |교집합| / |구간 A|
     (인접 DB 를 관측했을 때 원본으로부터 얼마나 구별되기 어려운지)
+
+    현재는 사용하지 않고 있음.
     """
     lo = max(a_lo, b_lo)
     hi = min(a_hi, b_hi)
@@ -188,8 +189,6 @@ def _resolve_target_col(df: pd.DataFrame, target_col: str, db_name: str) -> str:
     데이터셋마다 표기가 달라질 수 있다(예: CardBase 는 'Credit_Limit',
     Bank 는 'credit_limit'). pandas 의 df[...] 는 대소문자를 구분하므로
     이름이 1글자만 달라도 KeyError 가 난다.
-
-    순서: ① 정확 일치 → ② 대소문자/밑줄 무시 일치 → ③ 실패 시 안내.
     """
     if target_col in df.columns:
         return target_col
@@ -215,7 +214,7 @@ def _resolve_target_col(df: pd.DataFrame, target_col: str, db_name: str) -> str:
 
 @st.cache_data(show_spinner="시뮬레이션 실행 중…")
 def simulate(db_name: str, risk_level: int) -> SimResult:
-    """리스크 레벨 하나에 대한 완전한 시뮬레이션 결과를 반환.
+    """유틸리티 레벨 하나에 대한 완전한 시뮬레이션 결과를 반환.
 
     캐시 키: (db_name, risk_level).
     seed 와 컬럼 매핑이 모듈 상수라 이 두 값만으로 유일하게 결정됨.
@@ -370,7 +369,7 @@ def trace(db_name: str) -> Trace:
 
 
 def fmt_sig(v, sig: int = 3) -> str:
-    """유효숫자 기준 표시 — 0.187 → '0.187', 0.0837 → '0.0837', 265.8 → '266'."""
+    """유효숫자 기준 표시."""
     if v is None or not np.isfinite(v):
         return "-"
     if v == 0:

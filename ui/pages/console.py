@@ -1,14 +1,5 @@
 """질의 콘솔 — 자연어 질의 → 가드레일 → ε 예산 → 에이전트 코드 → DP 응답.
 
-화면은 design/platform_v14.html 의 '질의 콘솔'을 Streamlit 으로 옮긴 것이다.
-
-구성 (위→아래)
-    상단 바
-    밴드 헤더 : 질의 대상(데이터셋) 선택 · 예산 신청 · ε 도넛
-    필드 힌트 : 종류만 노출하는 카드 스트립 (건수·비율·최소·최대 없음)
-    대화      : 질문 / 생성 코드 / DP 응답
-    입력      : 본문 흐름 안의 폼 (하단 고정 오버레이 없음)
-
 질의 1건의 처리 순서는 기획서의 '접근 경로 단일화'를 그대로 따른다.
     guardrail → state.can_spend → agent_bridge → state.record_query
 어느 단계에서 막혀도 eps_spent=0 으로 기록해 감사 추적은 남긴다.
@@ -45,16 +36,6 @@ TL = {k: fields.SPECS[k]["title"] for k in ORD}
 MAX_THREAD = 10
 # 타이핑 효과 총 재생 시간(초) — 코드 길이와 무관하게 이 시간 안에 끝난다.
 TYPE_SECONDS = 1.7
-
-
-# def _store() -> dict:
-#     """대화 저장소 — (계정 → 데이터셋 → 메시지). 계정이 다르면 절대 섞이지 않는다."""
-#     user = st.session_state.get("username") or "_anon"
-#     return st.session_state.setdefault("threads", {}).setdefault(user, {})
-
-
-# def _msgs(db: str) -> list:
-#     return _store().setdefault(db, [])
 
 
 def _user() -> str:
@@ -274,7 +255,8 @@ def _suggestions(cur: str) -> None:
         return
     qs = [
         f"{pat.get('label', '')}에 따라 {meas.get('label', '')} 중앙값이 얼마나 차이 나?",
-        f"{fil.get('label', '')} 조건을 더 걸어서 다시 봐줘",
+        # f"{fil.get('label', '')} 조건을 더 걸어서 다시 봐줘",
+        f"{meas.get('label', '')} 평균값이 뭐야?",
     ]
     cols = st.columns(len(qs))
     for c, q in zip(cols, qs):

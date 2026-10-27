@@ -3,7 +3,7 @@
 
 분석가는 create() 로 리스크 업그레이드 신청을 남기고,
 관리자는 decide() 로 결재. 승인이 통과하면 db.set_user_override() 를
-호출해 (사용자 × DB) 개인 오버라이드가 생성된다.
+호출해 (사용자 × DB) 개인 정책이 생성된다.
 
 Status 값
     pending     관리자 검토 대기
@@ -91,7 +91,7 @@ def decide(req_id: int, *, reviewer: str, status: str,
     """결재.
     status ∈ {approved, partial, rejected}.
     approved_level 이 설정되고 status 가 approved/partial 이면
-    db.set_user_override() 로 개인 오버라이드가 기록된다.
+    db.set_user_override() 로 개인 정책이 기록된다.
     """
     assert status in {"approved", "partial", "rejected"}
 

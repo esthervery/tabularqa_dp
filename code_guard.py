@@ -4,7 +4,6 @@ dp_agent_wrap.InlineStatementExecutor 가 exec() 직전에 호출한다.
   1) 정규식 1차 필터 — 주석을 뺀 코드에서 명백한 위험 패턴을 거른다.
   2) AST 검사       — 문장 종류 · 이름 · 속성 · 문자열 조립을 검사한다.
   3) 제한 builtins  — 실행 네임스페이스에는 허용 목록의 내장 함수만 넣는다.
-프로세스/OS 수준 격리를 대신하지는 않는다.
 """
 from __future__ import annotations
 

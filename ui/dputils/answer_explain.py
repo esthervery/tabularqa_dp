@@ -38,7 +38,7 @@ _SYSTEM = """너는 차등 프라이버시 데이터 플랫폼의 질의 콘솔�
 
 
 def fmt_value(v) -> str:
-    """7249.80844 → '7,249.81'. 숫자가 아니면 문자열 그대로."""
+    """숫자가 아니면 문자열 그대로."""
     try:
         return f"{float(v):,.2f}"
     except (TypeError, ValueError):

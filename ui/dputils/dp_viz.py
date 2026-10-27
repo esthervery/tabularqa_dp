@@ -1,14 +1,10 @@
-"""프라이버시 분석 — 신뢰구간 수렴 애니메이션 (demo 브랜치).
-
-dev-esther 의 ui/dp_viz.py 에서 필요한 부분만 옮겨 다시 썼다.
+"""프라이버시 분석 — 신뢰구간 수렴 애니메이션
 
 속도는 일정하게
     프레임마다 질의 QUERIES_PER_FRAME 회씩 늘리고, 간격 FRAME_INTERVAL_S 초로 고정한다.
     총 길이를 고정하지 않으므로 도중에 빨라지거나 느려지지 않는다.
         Utility 1 (k=20)  → 10프레임 · 약 2초
         Utility 5 (k=100) → 50프레임 · 약 10초
-y축은 데이터셋마다 고정 (모든 Utility · 모든 프레임 공통) → 레벨 간 폭 비교가 된다.
-그림 안 글자는 한글 — 시스템 한글 글꼴을 찾아 쓴다 (KO_FONT 가 None 이면 글자 깨짐).
 """
 from __future__ import annotations
 
@@ -51,7 +47,6 @@ KO_FONT = _setup_font()
 
 
 def _ylim(tr: "dp_sim.Trace") -> tuple[float, float]:
-    """k=3 이후 CI + 모든 응답 + 참 평균이 들어가는 범위 (k=2 의 큰 CI 는 잘려 보이게 둔다)."""
     v = np.concatenate([tr.noisy, tr.ci_los[2:], tr.ci_his[2:], [tr.true_mean]])
     v = v[np.isfinite(v)]
     lo, hi = float(v.min()), float(v.max())
@@ -93,7 +88,7 @@ def _frame(tr, k_now: int, k_tot: int, ylim, ylabel: str) -> bytes:
 
 
 def stats_html(tr, k_now: int, k_tot: int) -> str:
-    """그래프 오른쪽 수치 패널 — 그림 밖에 두어 그래프를 가리지 않는다."""
+    """그래프 오른쪽 수치 패널"""
     i = k_now - 1
     m, lo, hi = tr.cum_means[i], tr.ci_los[i], tr.ci_his[i]
     ok = np.isfinite(lo) and np.isfinite(hi)

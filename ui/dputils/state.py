@@ -4,9 +4,7 @@ Streamlit 은 매 rerun 마다 스크립트를 처음부터 다시 실행하므�
 페이지 간에 공유해야 하는 값은 모두 st.session_state 에 넣는다.
 
 [0923 수정] 예산을 데이터셋 단위로 분리
-    이전에는 소모 ε 을 세션 단일 스칼라(spent)로만 들고 있어서
-    데이터셋을 바꿔도 누적 소모가 그대로 넘어갔다 (= 데이터셋 구분 없이 쌓임).
-    이제 소모 ε 과 질의 기록은 SQLite 의 query_log 에 (계정 × 데이터셋) 단위로
+    소모 ε 과 질의 기록은 SQLite 의 query_log 에 (계정 × 데이터셋) 단위로
     남기고, 세션은 "지금 선택된 데이터셋"의 값을 조회해서 보여주기만 한다.
 
     · 누적 소모 ε  = query_log 의 SUM(eps_spent)   → spent_of(db)
@@ -74,10 +72,6 @@ def init() -> None:
 
 def logout() -> None:
     """세션 상태를 '전부' 지우고 로그인 전 상태로 되돌린다.
-
-    DEFAULTS 목록만 지우면, 이후 페이지에서 새로 만든 키(threads 등)가 살아남아
-    다음 로그인 계정에 이전 계정의 대화가 노출된다 → 화이트리스트 대신 전체 삭제.
-    소모 ε 과 질의 기록은 SQLite(query_log)에 있으므로 지워도 보존된다.
     """
     st.session_state.clear()
     init()
@@ -86,14 +80,6 @@ def logout() -> None:
 # [0928 수정] 데이터셋 전환 시 콘솔 영역 초기화
 def reset_console() -> None:
     """이전 데이터셋에서 받아온 콘솔 영역의 코드·결과를 비운다.
-
-    데이터셋 selectbox 의 on_change 콜백으로 호출된다.
-    콜백은 스크립트 재실행 "전"에 실행되므로, 본문에서 조건 비교로 지우는 방식과 달리
-    이전 데이터셋의 코드·결과가 한 프레임 보였다가 사라지는 깜빡임이 없다.
-
-    주의: 이 함수는 st.session_state["db_name"] 을 읽지 않는다.
-    (콜백 시점의 db_name 이 새 값인지 이전 값인지에 의존하지 않기 위함 —
-     어느 쪽이든 "콘솔만 비운다"는 동작은 동일하다.)
     """
     st.session_state.manual_code = DEFAULTS["manual_code"]
     st.session_state.last_result = None
@@ -115,7 +101,7 @@ def log(kind: str, detail: str, cost: float = 0.0) -> None:
 def apply_effective_policy(db_name: str | None = None) -> dict:
     """지정된 DB 의 유효 정책을 세션에 반영.
 
-    우선순위: 사용자 오버라이드 > DB 기본 정책 > 시스템 기본값.
+    우선순위: 사용자 개별 정책 > DB 기본 정책 > 시스템 기본값.
     Agent Console 진입/새로고침 시 호출된다.
     """
     from ui import db as _db
@@ -166,9 +152,7 @@ def can_spend(cost: float, db_name: str | None = None) -> bool:
 def spend(cost: float, kind: str, detail: str,
           db_name: str | None = None) -> bool:
     """상한 내면 True 반환하고 감사 로그를 남긴다. 초과면 아무것도 안 하고 False.
-
-    실제 ε 원장 값은 record_query() 가 query_log 에 남기는 eps_spent 로 집계된다.
-    (여기서는 예산 초과 여부 판정과 감사 로그만 담당한다.)
+    실제 ε 원장 값은 eps_spent 로 집계된다.
     """
     if not can_spend(cost, db_name):
         return False

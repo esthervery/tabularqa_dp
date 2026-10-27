@@ -2,13 +2,12 @@
 
 흐름
     guardrail.check() 가 '허용 + 질의코드' 를 돌려준다
-    → 에이전트가 정답(숫자 하나)을 계산한다
+    → sem-eval 에이전트가 정답(숫자 하나)을 계산한다
     → privatize(정답, 질의코드, 데이터셋, ε) 가 Δ 를 골라 Laplace(0, Δ/ε) 를 더한다.
 
 민감도 파일
-    루트의 sensitivity.json (sensitivity.ipynb 셀 7 이 생성).
+    루트의 sensitivity.json
     datasets[<db>]["delta"] = {"mean", "median", "max", "min"} — 국소 민감도(한 행 교체).
-    범위 정보가 들어 있으므로 커밋하지 않는다(.gitignore).
 
 원칙
     fail-closed — 파일·데이터셋·질의코드·정답 중 하나라도 이상하면 NoiseError.
@@ -72,7 +71,7 @@ def _datasets() -> dict:
 
 
 def delta_of(code: str, db_name: str) -> float:
-    """질의코드 × 데이터셋 → 최종 Δ (하한 적용 후)."""
+    """질의코드 × 데이터셋 → 최종 Δ."""
     terms = TERMS.get(code)
     if not terms:
         raise NoiseError(f"알 수 없는 질의코드입니다 ({code or '없음'})")

@@ -1,10 +1,5 @@
 """예산 신청 (분석가) — Utility 레벨 상향 요청.
 
-Renders (위→아래):
-    1) 신청 카드 : 신청 대상(왼쪽) + 도넛 카드(오른쪽, 콘솔과 같은 budget_meter)
-                   → Utility 레벨 선택(고정 폭 버튼) → 사유 → [신청 제출]
-    2) 내 신청 이력 (상단 바에서 고른 데이터셋만)
-
 데이터 경로
     현재 정책 : db.get_effective_policy  (오버라이드 > DB 기본 > 시스템 기본)
     소모 ε    : db.spent_epsilon         (query_log SUM)

@@ -9,7 +9,7 @@
                            (pending / approved / partial / rejected)
     dp_policy              DB별 기본 정책. 관리자가 [확정] 하면 저장.
                            없으면 DEFAULT_POLICY (Risk 1) 가 fallback.
-    user_policy_override   (username × db_name) 개인 오버라이드.
+    user_policy_override   (username × db_name) 개인 정책.
                            예산 신청이 승인되면 여기에 기록.
                            Agent Console 진입/새로고침 시 이 값이 우선 적용.
     query_log              (username × db_name) 질의·응답 기록 + 소모 ε.
@@ -38,10 +38,10 @@
     confirm_policy(admin, db, risk)     DB 기본 정책 확정 (upsert)
     policy_history(limit=?)             확정 이력
 
-    ── 사용자 오버라이드 ──
-    get_user_override(user, db)         (user × db) 오버라이드 조회 (없으면 None)
+    ── 사용자 개별 정책 ──
+    get_user_override(user, db)         (user × db) 개별 정책 조회 (없으면 None)
     set_user_override(user, db, risk, approver, req_id?)
-    get_effective_policy(user, db)      오버라이드 > 기본 > DEFAULT 순 fallback
+    get_effective_policy(user, db)      개별 정책 > 기본 > DEFAULT 순 fallback
 
     ── 리스크 레벨 접근 헬퍼 ──
     risk_level_of(user, db)             현재 유효 정책의 리스크 레벨
@@ -355,23 +355,6 @@ def get_eps_cap(username: str) -> float:
     return float(row["eps_cap"]) if row else 10.0
 
 
-def grant_eps(username: str, extra: float) -> float:
-    """개인 상한(users.eps_cap)을 extra 만큼 증액하고 새 값 반환.
-
-    지금 스키마에서는 리스크 오버라이드가 별도 테이블로 관리되므로
-    이 함수는 (호환용) 사용되지 않는다. 필요 시 참고용 지표로만.
-    """
-    with connect() as con:
-        con.execute(
-            "UPDATE users SET eps_cap = eps_cap + ? WHERE username = ?",
-            (float(extra), username),
-        )
-        row = con.execute(
-            "SELECT eps_cap FROM users WHERE username = ?", (username,)
-        ).fetchone()
-    return float(row["eps_cap"]) if row else 0.0
-
-
 def is_admin(username: str) -> bool:
     """DB 기준 관리자 여부 (세션 값을 믿지 않고 매번 확인)."""
     with connect() as con:
@@ -521,7 +504,6 @@ def set_user_override(username: str, db_name: str, risk_level: int,
 
 # ── 유효 정책 (effective policy) ────────────────
 # 우선순위: 사용자 오버라이드 > DB 기본 정책 > DEFAULT_POLICY
-
 def get_effective_policy(username: str | None, db_name: str) -> dict:
     """이 사용자가 이 DB 를 볼 때 실제로 적용되는 정책.
 

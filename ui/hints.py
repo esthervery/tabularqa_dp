@@ -1,7 +1,6 @@
 """필드 힌트 — 화면에 올릴 카드 페이로드.
 
 정본은 `ui/hints.json` 이다. 이 파일은 두 가지 일만 한다.
-
     load()            hints.json 을 읽어 {db: payload} 로 반환 (실패 시 빈 dict)
     rebuild(force)    parquet 을 다시 읽어 hints.json 을 재생성
 
@@ -28,7 +27,7 @@ _MIN_FIL_KINDS = 5    # 수치형 하한 — 이보다 적으면 범주형이어
 # ── 읽기 ────────────────────────────────────────────────
 
 def load() -> dict:
-    """{db_name: payload}. 파일이 없거나 깨졌으면 빈 dict (화면은 밴드를 생략)."""
+    """{db_name: payload}. 파일이 없거나 깨졌으면 빈 dict."""
     try:
         return json.loads(JSON_PATH.read_text(encoding="utf-8"))
     except Exception:
