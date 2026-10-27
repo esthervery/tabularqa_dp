@@ -7,3 +7,6 @@ results/
 __pycache__
 dp_demo.db
 environment.yml
+
+sensitivity.json
+cul_delta.ipynb
