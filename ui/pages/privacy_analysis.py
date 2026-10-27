@@ -26,7 +26,7 @@ except Exception as _e:   # scipy · matplotlib 미설치 등 — 화면은 뜨�
     _SIM_ERR = f"{type(_e).__name__}: {_e}"
 
 RISKS = [1, 2, 3, 4, 5]
-COLS = [1.6, 1, 1, 1, 1, 1, 0.7]          # 데이터셋 | U1..U5 | 축소 — 머리줄·값줄 공통
+COLS = [1.6, 1, 1, 1, 1, 1]               # 데이터셋 | U1..U5 — 머리줄·값줄 공통
 EPS_Q = 0.1
 
 SEL, PLAY, DS, FLASH = "pa_sel", "pa_play", "pa_ds", "pa_flash"
@@ -68,7 +68,6 @@ def _do_confirm(admin: str, ds: str) -> None:
 
 
 # ── 화면 ───────────────────────────────────────────────
-
 def render() -> None:
     design.inject()
 
@@ -83,6 +82,10 @@ def render() -> None:
         return
     _sync(name)
 
+    # 1) 정책 설정 (맨 위)
+    _confirm(name, spec)
+
+    # 2) 프라이버시 리스크 분석
     if dp_sim is None:
         st.markdown(design.warn("시뮬레이터를 불러오지 못했습니다 — scipy · matplotlib 설치가 필요합니다 "
                                 f"({_SIM_ERR})"), unsafe_allow_html=True)
@@ -96,11 +99,11 @@ def render() -> None:
         if tr is not None:
             _matrix(name, spec, tr)
 
-    _confirm(name, spec)
+    # 3) 데이터셋 별 정책 현황 (맨 아래, 별도 섹션)
+    _status(name)
 
 
 # ── 1) 프라이버시 리스크 분석 ─────────────────────────────
-
 def _matrix(name: str, spec: dict, tr) -> None:
     widths = {r: tr.final(r)[3] for r in RISKS}
     wmax = max(widths.values()) or 1.0
@@ -114,13 +117,11 @@ def _matrix(name: str, spec: dict, tr) -> None:
             "최종 95% 신뢰구간 폭"), unsafe_allow_html=True)
 
         head = st.columns(COLS, gap="small", vertical_alignment="center")
-        head[0].markdown('<div class="pa-h">데이터셋</div>', unsafe_allow_html=True)
         for i, r in enumerate(RISKS, 1):
             with head[i]:
                 st.button(f"Utility {r}",
                           key=f"pa_uton_{r}" if sel == r else f"pa_ut_{r}",
                           on_click=_pick, args=(r,), width="stretch")
-        head[6].markdown('<div class="pa-h r">축소</div>', unsafe_allow_html=True)
 
         row = st.columns(COLS, gap="small", vertical_alignment="center")
         row[0].markdown(
@@ -128,8 +129,6 @@ def _matrix(name: str, spec: dict, tr) -> None:
             f'<span class="ts">{name} · {_esc(m["label"])}</span></div>', unsafe_allow_html=True)
         for i, r in enumerate(RISKS, 1):
             row[i].markdown(_cell(widths[r], wmax, tr.k_of(r), sel == r), unsafe_allow_html=True)
-        ratio = f"{widths[1] / widths[5]:.1f}×" if widths[5] else "-"
-        row[6].markdown(f'<div class="pa-ratio">{ratio}</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="pa-div"></div>', unsafe_allow_html=True)
         _sim(spec, tr, sel)
@@ -176,15 +175,12 @@ def _sim(spec: dict, tr, sel: int | None) -> None:
 
 
 # ── 2) 데이터셋 기본 정책 설정 ────────────────────────────
-
 def _confirm(name: str, spec: dict) -> None:
     admin = st.session_state.get("username") or "admin"
 
-    with st.container(border=True, key="card_confirm"):
-        st.markdown(design.card_head(
-            "데이터셋 기본 정책 설정",
-            f"대상: {spec['title']} · 위 표에서 Utility 를 누르면 선택칸도 함께 바뀝니다"),
-            unsafe_allow_html=True)
+    with st.container(key="sec_confirm"):
+        st.markdown(design.card_head("데이터셋 기본 정책 설정", f"대상: {spec['title']}"),
+                    unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns([1.1, 2.2, 0.8], vertical_alignment="bottom")
         with c1:
@@ -196,7 +192,13 @@ def _confirm(name: str, spec: dict) -> None:
             st.button("확정", type="primary", key="pol_ok", width="stretch",
                       on_click=_do_confirm, args=(admin, name))
 
-        st.markdown('<div class="reqdiv"></div>', unsafe_allow_html=True)
+
+def _status(name: str) -> None:
+    """3) 데이터셋 별 정책 현황 — 별도 카드."""
+    with st.container(border=True, key="card_policies"):
+        st.markdown(design.card_head(
+            "데이터셋 별 정책 현황",
+            "수동 = 관리자 확정 · 자동 = 확정 기록 없음(시스템 기본값)"), unsafe_allow_html=True)
         _policies(name)
 
 

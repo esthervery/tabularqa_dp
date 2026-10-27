@@ -769,7 +769,6 @@ div[role="dialog"] .codeblk{ white-space:pre-wrap !important; word-break:break-a
 .pa-cell.on .bar span{ background:var(--pri); }
 .pa-cell.on .v{ color:var(--pri2); font-weight:700; }
 .pa-cell .k{ font-size:10.5px; color:var(--dim); }
-.pa-ratio{ text-align:right; font-family:var(--mono); font-size:13px; font-weight:600; color:var(--suc2); }
 
 /* Utility 버튼 (열 제목) — 기본 연회색 · hover 보라 테두리 · 선택 보라 바탕 */
 .stApp [class*="st-key-pa_ut_"] button,
@@ -1049,21 +1048,25 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 
 
 /* ══ 11-x. 프라이버시 분석 — 1027 수정 ══ */
-/* Utility 1~5 → 텍스트 링크 (선택 열 = 진하게 + 밑줄) */
+/* Utility 1~5 (열 제목) — 테두리 있는 작은 버튼 · 오른쪽 정렬 · 선택 = 보라 바탕 */
+.stApp div[class*="st-key-pa_ut"] .stButton{ display:flex !important; justify-content:flex-end !important; }
 .stApp div[class*="st-key-pa_ut"] .stButton>button{
-  border:none !important; background:transparent !important; box-shadow:none !important;
-  min-height:0 !important; height:auto !important; padding:4px 0 !important;
-  justify-content:flex-end !important;            /* 아래 값(오른쪽 정렬)과 맞춤 */
+  width:auto !important; height:26px !important; min-height:26px !important;
+  padding:0 10px !important; border-radius:8px !important;
+  border:1px solid var(--priline) !important; background:#fff !important;
+  box-shadow:none !important; transition:all .15s ease;
 }
 .stApp div[class*="st-key-pa_ut"] .stButton>button p{
-  font-size:13px !important; font-weight:600 !important; color:var(--pri) !important;
-  text-underline-offset:4px;
+  font-size:12px !important; font-weight:600 !important; color:var(--pri) !important;
 }
-.stApp div[class*="st-key-pa_ut"] .stButton>button:hover p{ text-decoration:underline; }
-.stApp div[class*="st-key-pa_uton_"] .stButton>button p{
-  color:var(--pri2) !important; font-weight:800 !important;
-  text-decoration:underline; text-decoration-thickness:2px;
+.stApp div[class*="st-key-pa_ut_"] .stButton>button:hover{
+  border-color:var(--pri) !important; background:var(--prisoft) !important;
 }
+.stApp div[class*="st-key-pa_uton_"] .stButton>button{
+  background:var(--pri) !important; border-color:var(--pri) !important;
+  box-shadow:0 2px 6px rgba(99,102,241,.25) !important;
+}
+.stApp div[class*="st-key-pa_uton_"] .stButton>button p{ color:#fff !important; }
 
 /* 막대 — 선택 여부와 관계없이 모두 진하게 */
 .stApp .pa-cell, .stApp .pa-cell .bar, .stApp .pa-cell .bar span{ opacity:1 !important; }
@@ -1075,6 +1078,21 @@ div[role="dialog"] h2{font-size:20px !important;font-weight:700 !important;lette
 .dpstat .r{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
 .dpstat .k{ font-size:12px; color:var(--mid); }
 .dpstat b{ font-size:13.5px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+
+
+/* ══ 11-x. 데이터셋 별 정책 현황 — 얇은 행 ══ */
+.stApp .st-key-card_policies .trow{
+  padding-top:6px !important; padding-bottom:6px !important;
+  min-height:0 !important; align-items:center !important;
+}
+/* 데이터셋 이름 + 코드 한 줄로 */
+.stApp .st-key-card_policies .trow .tt{ display:inline !important; font-size:13px !important; }
+.stApp .st-key-card_policies .trow .ts{ display:inline !important; margin-left:8px; font-size:11px !important; }
+/* Utility 배지 · 자동/수동 배지 작게 */
+.stApp .st-key-card_policies .trow [class*="pill"]{
+  padding:1px 8px !important; font-size:11px !important; line-height:1.5 !important;
+}
+.stApp .st-key-card_policies .pmode{ padding:1px 7px !important; font-size:10.5px !important; }
 
 </style>
 """
