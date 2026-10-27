@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from ui import db, design, fields
+from ui import db, design, fields, authz
 
 try:
     from ui import dp_sim, dp_viz
@@ -69,6 +69,7 @@ def _replay() -> None:
 
 
 def _do_confirm(admin: str, ds: str) -> None:
+    if not authz.is_admin_now(): return
     lv = int(st.session_state.get("pol_lv") or 1)
     note = (st.session_state.get("pol_note") or "").strip()
     try:
@@ -82,6 +83,7 @@ def _do_confirm(admin: str, ds: str) -> None:
 # ── 화면 ───────────────────────────────────────────────
 def render() -> None:
     design.inject()
+    authz.require_admin()
 
     msg = st.session_state.pop(FLASH, None)
     if msg:

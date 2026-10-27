@@ -17,7 +17,7 @@ import html
 
 import streamlit as st
 
-from ui import db, design, requests
+from ui import db, design, requests, authz
 
 E = db.RISK_TO_EPSILON
 PAGE_SIZE = 10                                    # 한 페이지 행 수 (두 줄 행이라 히스토리보다 적게)
@@ -31,6 +31,7 @@ HEAD = ("신청 시각", "계정", "데이터셋", "신청 내용", "상태", "�
 
 def render() -> None:
     design.inject()
+    authz.require_admin()
     msg = st.session_state.pop("adm_msg", None)           # 결재 직후 rerun 에서 알림
     if msg:
         st.toast(msg)
@@ -38,7 +39,7 @@ def render() -> None:
     ds = st.session_state.get("adm_ds", "전체")           # 상단 바에서 고른 값 (기본 '전체')
     scope = None if ds == "전체" else ds
 
-    admin = st.session_state.get("username") or "admin"
+    admin = authz.require_admin()
     s = requests.stats(db_name=scope)
     n_ok = s["approved"] + s["partial"]
     n_all = sum(s.values())
@@ -192,6 +193,7 @@ def _query_log(user: str, ds: str, total: int) -> None:
 
 
 def _apply(r: dict, admin: str, lv: int | None, note: str, reject: bool = False) -> None:
+    if not authz.is_admin_now(): return
     rid, req_lv = int(r["id"]), int(r["requested_level"])
     who = f"{r['username']} · {r['db_name']}"
     try:

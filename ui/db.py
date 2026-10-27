@@ -370,6 +370,15 @@ def grant_eps(username: str, extra: float) -> float:
     return float(row["eps_cap"]) if row else 0.0
 
 
+def is_admin(username: str) -> bool:
+    """DB 기준 관리자 여부 (세션 값을 믿지 않고 매번 확인)."""
+    with connect() as con:
+        row = con.execute(
+            "SELECT is_admin FROM users WHERE username = ?", (username,)
+        ).fetchone()
+    return bool(row and row["is_admin"])
+
+
 def list_users() -> list[sqlite3.Row]:
     with connect() as con:
         return con.execute(
