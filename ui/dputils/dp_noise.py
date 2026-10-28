@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 
 SENS_FILE = Path(os.getenv("DP_SENS_FILE")
-                 or Path(__file__).resolve().parent.parent / "sensitivity.json")
+                 or Path(__file__).resolve().parents[2] / "sensitivity.json")
 
 # Δ 하한 = FLOOR_RATIO × (그 데이터셋의 평균 Δ).
 # 같은 값이 많은 컬럼에서 국소 Δ 가 0 이 되어 노이즈가 사라지는 것을 막는다. 0 이면 하한 없음.

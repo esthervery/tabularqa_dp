@@ -26,7 +26,6 @@ HEAD = ("신청 시각", "계정", "데이터셋", "신청 내용", "상태", "�
 
 def render() -> None:
     design.inject()
-    authz.require_admin()
     msg = st.session_state.pop("adm_msg", None)           # 결재 직후 rerun 에서 알림
     if msg:
         st.toast(msg)
@@ -205,26 +204,7 @@ def _apply(r: dict, admin: str, lv: int | None, note: str, reject: bool = False)
         return
     st.session_state["adm_sel"] = None
     st.session_state["adm_msg"] = msg
-    st.rerun()
-
-
-def _apply(rid: int, admin: str, lv: int | None, note: str,
-           req_lv: int, reject: bool = False) -> None:
-    try:
-        if reject:
-            requests.decide(rid, reviewer=admin, status="rejected", note=note)
-            msg = f"신청 #{rid} 을 거절했습니다."
-        else:
-            status = "approved" if lv == req_lv else "partial"
-            requests.decide(rid, reviewer=admin, status=status, approved_level=lv, note=note)
-            msg = (f"신청 #{rid} 을 Utility {lv} 로 "
-                   f"{'승인' if status == 'approved' else '조정 승인'}했습니다.")
-    except Exception as e:
-        st.error(f"결재를 처리하지 못했습니다 ({type(e).__name__}: {e})")
-        return
-    st.session_state["adm_sel"] = None
-    st.session_state["adm_msg"] = msg
-    st.rerun()                                            # 대화상자 닫기 + 표·요약 갱신
+    st.rerun()                                     
 
 
 # ── 헬퍼 ──────────────────────────────────────────────
